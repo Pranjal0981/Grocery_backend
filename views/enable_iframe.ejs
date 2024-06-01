@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payment</title>
+</head>
+
+<body>
+    <script src="https://ebz-static.s3.ap-south-1.amazonaws.com/easecheckout/easebuzz-checkout.js"></script>
+    <script>
+        window.addEventListener('load', function () {
+            var key = "<%= key %>";
+            var access_key = "<%= access_key %>";
+            var easebuzzCheckout = new EasebuzzCheckout(key, "prod");
+            var options = {
+                access_key: access_key,
+                onResponse: (response) => {
+                    document.getElementById('response').innerText = JSON.stringify(response);
+                },
+                theme: "#123456"
+            };
+            easebuzzCheckout.initiatePayment(options);
+        });
+    </script>
+    <p id='response'></p>
+</body>
+
+</html>
