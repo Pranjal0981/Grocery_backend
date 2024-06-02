@@ -351,28 +351,74 @@ exports.fetchAllProducts = catchAsyncErrors(async (req, res, next) => {
     }
 });
 
-
 exports.fetchOutOfStockProducts = catchAsyncErrors(async (req, res, next) => {
     try {
         const page = parseInt(req.query.page) || 1;
-        const limit = 5; // Number of products per page
+        const limit = 1000; // Number of products per page
         const skip = (page - 1) * limit;
 
-        const outOfStockProducts = await Promise.all([
-            Product.find({ stock: 0 }).skip(skip).limit(limit),
+        // Aggregation to find out-of-stock products
+        const outOfStockProductsAggregation = await Store.aggregate([
+            {
+                $match: {
+                    $or: [
+                        { stock: 0 },
+                        { stock: { $exists: false } },
+                        { stock: null }
+                    ]
+                }
+            },
+            {
+                $lookup: {
+                    from: 'products', // Collection name in MongoDB
+                    localField: 'productId',
+                    foreignField: '_id',
+                    as: 'productDetails'
+                }
+            },
+            { $unwind: '$productDetails' },
+            { $match: { productDetails: { $ne: null } } }, // Ensure productDetails is not null
+            { $skip: skip },
+            { $limit: limit },
+            {
+                $project: {
+                    _id: 1,
+                    storeName: 1,
+                    stock: 1,
+                    productId: '$productId', // Include productId in the result
+                    productDetails: {
+                        productName: 1,
+                        description: 1,
+                        sellingPrice: 1,
+                        category: 1,
+                        brand: 1,
+                        purchasePrice: 1,
+                        MRP: 1,
+                        size: 1,
+                        gst: 1,
+                        cgst: 1,
+                        image: 1,
+                        productCode: 1,
+                        createdAt: 1
+                    }
+                }
+            }
         ]);
 
-        // Merge the arrays of products into one array
-        const allOutOfStockProducts = outOfStockProducts.reduce((acc, products) => {
-            return acc.concat(products);
-        }, []);
-
-        const totalCount = allOutOfStockProducts.length;
+        // Get the total count of out-of-stock products including null stock values
+        const totalCount = await Store.countDocuments({
+            $or: [
+                { stock: 0 },
+                { stock: { $exists: false } },
+                { stock: null }
+            ]
+        });
         const totalPages = Math.ceil(totalCount / limit);
 
         res.status(200).json({
             success: true,
-            outOfStockProducts: allOutOfStockProducts,
+            outOfStockProducts: outOfStockProductsAggregation,
+            totalCount,
             totalPages,
         });
     } catch (error) {
@@ -383,6 +429,7 @@ exports.fetchOutOfStockProducts = catchAsyncErrors(async (req, res, next) => {
         });
     }
 });
+
 
 exports.fetchLastDayActiveUsers = catchAsyncErrors(async (req, res, next) => {
     try {
@@ -432,7 +479,10 @@ exports.updateProduct = catchAsyncErrors(async (req, res, next) => {
         console.log(req.body)
         const { id } = req.params;
         const updatedImageData = req.files ? req.files.image : null;
-        const { stock, store, ...updatedProductData } = req.body;
+        let { stock, store, ...updatedProductData } = req.body;
+
+        // Set stock to 0 if it's null
+        stock = stock === null ? 0 : stock;
 
         // Parse additionalStock from request body
         const additionalStock = [];
@@ -540,6 +590,7 @@ exports.updateProduct = catchAsyncErrors(async (req, res, next) => {
         });
     }
 });
+
 
 exports.updateOrderStatus=catchAsyncErrors(async(req,res,next)=>{
     try {
