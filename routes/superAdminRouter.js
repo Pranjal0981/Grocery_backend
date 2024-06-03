@@ -32,5 +32,5 @@ router.post('/forget-link/:token', superAdminForgetLink)
 
 router.get('/searchUser',isAuthenticated,searchUser)
 
-// router.get('/getUserQuery', isAuthenticated, getUserQuery)
+router.get('/getUserQuery', isAuthenticated, getUserQuery)
 module.exports=router

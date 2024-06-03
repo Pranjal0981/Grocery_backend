@@ -19,7 +19,8 @@ const Store=require('../models/StoreStock')
 const axios=require('axios')
 exports.currentUser = catchAsyncErrors(async (req, res, next) => {
     try {
-        console.log(req)
+        console.log(req);
+
         // Retrieve user ID from the request object (set by the isAuthenticated middleware)
         const userId = req.id;
 
@@ -33,6 +34,12 @@ exports.currentUser = catchAsyncErrors(async (req, res, next) => {
         // Set isAuth property if needed
         user.isAuth = true;
 
+        // Update the last login time to the current time
+        user.lastLogin = new Date();
+
+        // Save the user document with the updated lastLogin time
+        await user.save();
+
         // Send user data in the response
         res.json({ success: true, user });
     } catch (error) {
@@ -40,6 +47,7 @@ exports.currentUser = catchAsyncErrors(async (req, res, next) => {
         res.status(500).json({ success: false, message: 'Internal server error' });
     }
 });
+
 
 exports.signUp = catchAsyncErrors(async (req, res, next) => {
     try {
