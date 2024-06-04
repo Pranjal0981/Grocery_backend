@@ -632,7 +632,7 @@ exports.userOrder = catchAsyncErrors(async (req, res, next) => {
         }
 
         // Extract the checkOutCart, totalGrandPrice, and other details from the request body
-        const { checkOutCart, totalGrandPrice, email, paymentType } = req.body;
+        const { checkOutCart, totalGrandPrice, email, paymentType,orderId } = req.body;
         console.log(req.body);
 
         // Ensure checkOutCart, totalGrandPrice, email, and paymentType are provided
@@ -682,7 +682,7 @@ exports.userOrder = catchAsyncErrors(async (req, res, next) => {
             totalGrandPrice, // Set the totalGrandPrice
             PaymentType: paymentType, // Set the payment type
             pdfUrl ,// Set the PDF URL
-            OrderId:uuidv4()
+            OrderId: orderId
         });
 
         // Save the order document
@@ -794,6 +794,31 @@ exports.setAddressIndex = async (req, res, next) => {
         res.status(500).json({ success: false, message: 'Internal Server Error' });
     }
 };
+
+exports.clearCart = catchAsyncErrors(async (req, res, next) => {
+    try {
+        // Assuming Cart is your Mongoose model
+        await Cart.findOneAndUpdate(
+            { user: req.body.userId },
+            { $set: { products: [] } },
+            { new: true }
+        );
+
+        // Send a success response
+        res.status(200).json({
+            success: true,
+            message: 'Cart cleared successfully'
+        });
+    } catch (error) {
+        console.error('Error clearing cart:', error);
+        // Send an error response
+        res.status(500).json({
+            success: false,
+            message: 'Internal Server Error'
+        });
+    }
+});
+
 
 
 // exports.doPayment = catchAsyncErrors(async (req, res, next) => {
