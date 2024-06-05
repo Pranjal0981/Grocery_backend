@@ -1,5 +1,5 @@
 const express = require('express')
-const { currentUser, signUp, login, logout, updateUser, updateCart, deleteUser, doPayment, setAddressIndex, returnRequest, deleteAddress, addAddress, addToWishlist, fetchWishlist, deleteFromWishlist, fetchProducts, addToCart, deleteFromCart, fetchCartProducts, userforgetlink, userSendMail, userOrder, fetchUserOrder, contactUs, setPreferredStore, clearCart } = require('../controllers/indexController')
+const { currentUser, signUp, login, logout, updateUser, updateCart, deleteUser, doPayment, updateProductQuantity,setAddressIndex, returnRequest, deleteAddress, addAddress, addToWishlist, fetchWishlist, deleteFromWishlist, fetchProducts, addToCart, deleteFromCart, fetchCartProducts, userforgetlink, userSendMail, userOrder, fetchUserOrder, contactUs, setPreferredStore, clearCart } = require('../controllers/indexController')
 const { isAuthenticated } = require('../middlewares/auth')
 const { checkout, paymentVerification } = require('../controllers/paymentController')
 const router = express.Router()
@@ -58,4 +58,6 @@ router.post("/api/checkout",isAuthenticated,checkout);
 router.post("/api/paymentverification", paymentVerification);
 
 router.post('/clear-cart',isAuthenticated,clearCart)
+
+router.post('/updateProductQuantity',isAuthenticated,updateProductQuantity)
 module.exports = router

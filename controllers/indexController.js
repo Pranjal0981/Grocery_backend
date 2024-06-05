@@ -703,8 +703,54 @@ exports.userOrder = catchAsyncErrors(async (req, res, next) => {
     }
 });
 
+exports.updateProductQuantity = catchAsyncErrors(async (req, res, next) => {
+    try {
+        const { productId, quantity,userId} = req.body;
 
+        const user = await User.findById(userId);
+        if (!user || user.userType !== 'customer') {
+            return res.status(403).json({ success: false, message: 'Only customers can update products in the cart' });
+        }
 
+        if (!mongoose.Types.ObjectId.isValid(productId)) {
+            return res.status(400).json({ success: false, message: 'Invalid product ID' });
+        }
+
+        const cart = await Cart.findOne({ user: userId });
+        if (!cart) {
+            return res.status(404).json({ success: false, message: 'Cart not found for this user' });
+        }
+
+        const productIndex = cart.products.findIndex(item => item.productId.equals(productId));
+        if (productIndex === -1) {
+            return res.status(404).json({ success: false, message: 'Product not found in the cart' });
+        }
+
+        const product = cart.products[productIndex];
+        const productPrice = await Product.findById(product.productId).select('sellingPrice');
+
+        if (!productPrice) {
+            return res.status(404).json({ success: false, message: 'Product price not found' });
+        }
+
+        const totalPrice = quantity * productPrice.sellingPrice;
+        if (isNaN(totalPrice)) {
+            return res.status(400).json({ success: false, message: 'Invalid total price' });
+        }
+
+        product.quantity = quantity;
+        product.totalPrice = totalPrice;
+
+        // Calculate totalGrandPrice
+        cart.totalGrandPrice = cart.products.reduce((total, item) => total + (item.totalPrice || 0), 0);
+        await cart.save();
+
+        res.status(200).json({ success: true, message: 'Product quantity updated successfully', cart });
+    } catch (error) {
+        console.log(error)
+    }
+})
+    
 
 
 exports.fetchUserOrder = catchAsyncErrors(async (req, res, next) => {
