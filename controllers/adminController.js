@@ -218,26 +218,45 @@ exports.fetchOrders = catchAsyncErrors(async (req, res, next) => {
         const limit = 10;
         const skip = (page - 1) * limit;
 
-        // Find all store stocks for the given store name
-        const storeStocks = await Store.find({ storeName: store });
+        let orders;
+        let totalCount;
 
-        // Extract productIds from the store stocks found
-        const productIds = storeStocks.map(stock => stock.productId);
+        if (store) {
+            // Find all store stocks for the given store name
+            const storeStocks = await Store.find({ storeName: store });
 
-        // Find orders that have products belonging to the given store
-        const orders = await Order.find({ 'products.productId': { $in: productIds } })
-            .populate({
-                path: 'products.productId',
-                match: { _id: { $in: productIds } },
-                select: 'productName description MRP category brand purchasePrice sellingPrice image gst cgst productCode size'
-            })
-            .populate('userId')
-            .sort({ createdAt: -1 }) // Sort orders by createdAt field in descending order
-            .skip(skip)
-            .limit(limit);
+            // Extract productIds from the store stocks found
+            const productIds = storeStocks.map(stock => stock.productId);
 
-        // Count total number of orders for pagination
-        const totalCount = await Order.countDocuments({ 'products.productId': { $in: productIds } });
+            // Find orders that have products belonging to the given store
+            orders = await Order.find({ 'products.productId': { $in: productIds } })
+                .populate({
+                    path: 'products.productId',
+                    match: { _id: { $in: productIds } },
+                    select: 'productName description MRP category brand purchasePrice sellingPrice image gst cgst productCode size'
+                })
+                .populate('userId')
+                .sort({ createdAt: -1 }) // Sort orders by createdAt field in descending order
+                .skip(skip)
+                .limit(limit);
+
+            // Count total number of orders for pagination
+            totalCount = await Order.countDocuments({ 'products.productId': { $in: productIds } });
+        } else {
+            // Fetch all orders if store is not provided
+            orders = await Order.find({})
+                .populate({
+                    path: 'products.productId',
+                    select: 'productName description MRP category brand purchasePrice sellingPrice image gst cgst productCode size'
+                })
+                .populate('userId')
+                .sort({ createdAt: -1 }) // Sort orders by createdAt field in descending order
+                .skip(skip)
+                .limit(limit);
+
+            // Count total number of orders for pagination
+            totalCount = await Order.countDocuments({});
+        }
 
         // Calculate total number of pages
         const totalPages = Math.ceil(totalCount / limit);
@@ -248,6 +267,7 @@ exports.fetchOrders = catchAsyncErrors(async (req, res, next) => {
         res.status(500).json({ success: false, error: 'Internal Server Error' });
     }
 });
+
 
 
 

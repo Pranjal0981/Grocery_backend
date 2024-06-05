@@ -14,7 +14,7 @@ router.post('/upload-products',uploadProducts)
 
 router.get('/fetchProductStore/:storeName', isAuthenticated, fetchProductStockByStore);
 
-router.get('/fetchorders/:store',isAuthenticated,fetchOrders)
+router.get('/fetchOrders/:store?', isAuthenticated, fetchOrders);
 
 router.delete('/deleteProducts/:store/:productId', isAuthenticated, deleteProduct)
 
