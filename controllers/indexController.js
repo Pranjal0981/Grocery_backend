@@ -847,7 +847,7 @@ exports.clearCart = catchAsyncErrors(async (req, res, next) => {
         // Assuming Cart is your Mongoose model
         await Cart.findOneAndUpdate(
             { user: req.body.userId },
-            { $set: { products: [] } },
+            { $set: { products: [], totalGrandPrice: 0 } }, // Resetting the cart's products and total price
             { new: true }
         );
 
