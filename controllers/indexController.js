@@ -632,7 +632,7 @@ exports.userOrder = catchAsyncErrors(async (req, res, next) => {
         }
 
         // Extract the checkOutCart, totalGrandPrice, and other details from the request body
-        const { checkOutCart, totalGrandPrice, email, paymentType,orderId } = req.body;
+        const { checkOutCart, totalGrandPrice, email, paymentType, orderId, invoiceNumber } = req.body;
         console.log(req.body);
 
         // Ensure checkOutCart, totalGrandPrice, email, and paymentType are provided
@@ -682,7 +682,8 @@ exports.userOrder = catchAsyncErrors(async (req, res, next) => {
             totalGrandPrice, // Set the totalGrandPrice
             PaymentType: paymentType, // Set the payment type
             pdfUrl ,// Set the PDF URL
-            OrderId: orderId
+            OrderId: orderId,
+            InvoiceNumber: invoiceNumber
         });
 
         // Save the order document

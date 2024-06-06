@@ -33,6 +33,10 @@ const orderSchema = new mongoose.Schema({
     OrderId:{
         type:String,
         required:true
+    },
+    InvoiceNumber:{
+        type:String,
+        required:true
     }
 }, { timestamps: true });
 
