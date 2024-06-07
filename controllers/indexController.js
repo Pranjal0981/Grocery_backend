@@ -301,7 +301,7 @@ exports.addToCart = catchAsyncErrors(async (req, res, next) => {
 });
 
 
-exports.updateCart = async (req, res, next) => {
+exports.updateCart = catchAsyncErrors(async (req, res, next) => {
     try {
         const { userId, store, productIds } = req.body;
 
@@ -340,12 +340,13 @@ exports.updateCart = async (req, res, next) => {
             });
         }
 
-        for (const product of cart.products) {
+        for (let i = 0; i < cart.products.length; i++) {
+            const product = cart.products[i];
             if (productIds.includes(product.productId.toString())) {
                 const storeProduct = storeProducts[product.productId.toString()];
                 if (storeProduct) {
-                    product.store = store;
-                    product.stock = storeProduct.stock;
+                    cart.products[i].store = store;
+                    cart.products[i].stock = storeProduct.stock;
                 }
             }
         }
@@ -357,7 +358,8 @@ exports.updateCart = async (req, res, next) => {
         console.error('Error updating cart:', error);
         res.status(500).json({ success: false, message: 'Internal Server Error' });
     }
-};
+});
+
 
 
 
