@@ -10,6 +10,8 @@ const {sendmail} =require('../utils/nodemailer')
 const User=require('../models/userModel');
 const Order = require('../models/orderModel');
 const Store=require('../models/StoreStock')
+const jwt = require('jsonwebtoken');
+
 exports.registerAdmin = catchAsyncErrors(async (req, res, next) => {
     try {
         // console.log(req.body)
@@ -71,17 +73,34 @@ exports.loginAdmin = catchAsyncErrors(async (req, res, next) => {
 
 exports.currentAdmin = catchAsyncErrors(async (req, res, next) => {
     try {
-        console.log("======", req.id)
-        const admin = await Admin.findById(req.id).exec();
-        console.log("=====:", admin)
-        admin.isAuth = true
-        if (!admin) {
-            return res.status(404).json({ success: false, message: "User not found" });
+        // Check if token is available in the Authorization header
+        const authHeader = req.headers.authorization;
+
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+            return res.status(401).json({ success: false, message: 'User not authenticated' });
         }
+
+        const token = authHeader.split(' ')[1];
+
+        // Verify the token and extract user ID
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const userId = decoded.id;
+
+        const admin = await Admin.findById(userId).exec();
+
+        if (!admin) {
+            return res.status(404).json({ success: false, message: 'User not found' });
+        }
+
+        admin.isAuth = true;
+        admin.lastLogin = new Date();
+
+        await admin.save();
+
         res.json({ success: true, admin });
     } catch (error) {
-        console.error("Error fetching current user:", error);
-        res.status(500).json({ success: false, message: "Internal server error" });
+        console.error('Error fetching current admin:', error);
+        res.status(500).json({ success: false, message: 'Internal server error' });
     }
 });
 

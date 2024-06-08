@@ -28,8 +28,8 @@ const adminSchema = new mongoose.Schema({
     },
     password: {
         type: String,
-        minlength: [8, "Password should be at least 8 characters long"],
-        maxlength: [32, "Password should not exceed 32 characters"]
+        minlength: [4, "Password should be at least 4 characters long"],
+
     },
     lastLogin: {
         type: Date,
