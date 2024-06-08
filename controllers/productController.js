@@ -6,6 +6,7 @@ const { catchAsyncErrors } = require('../middlewares/catchAsyncError');
 const mongoose=require('mongoose')
 const Store=require('../models/StoreStock')
 const Cart=require('../models/cart')
+const jwt=require('jsonwebtoken')
 exports.getProducts = catchAsyncErrors(async (req, res, next) => {
     const page = req.query.page || 1; // Default to page 1 if not provided
     const limit = 1000;

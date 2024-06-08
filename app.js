@@ -3,19 +3,21 @@ const path = require('path');
 const express = require('express');
 const cors = require('cors');
 const fileupload = require('express-fileupload');
-const axios = require('axios');
 const bodyParser = require('body-parser');
 const session = require('express-session');
 const cookieParser = require('cookie-parser');
 const logger = require('morgan');
 const { v4: uuidv4 } = require('uuid');
-const Razorpay=require('razorpay')
+const passport = require('passport');
+const LocalStrategy = require('passport-local').Strategy;
+const Razorpay = require('razorpay');
+const User = require('./models/userModel'); // Assuming you have a User model
 const indexRouter = require('./routes/indexRouter');
 const adminRouter = require('./routes/adminRouter');
 const productRouter = require('./routes/productRouter');
 const superAdminRouter = require('./routes/superAdminRouter');
 const storeManager = require('./routes/storeRouter');
-const paymentRoute=require('./routes/paymentRouter')
+const paymentRoute = require('./routes/paymentRouter');
 const PORT = process.env.PORT || 3000;
 const app = express();
 require('./models/config');
@@ -25,10 +27,12 @@ const corsOptions = {
     origin: true,
     credentials: true
 };
+
 exports.instance = new Razorpay({
     key_id: process.env.RAZORPAY_API_KEY,
     key_secret: process.env.RAZORPAY_APT_SECRET,
 });
+
 app.use(cors(corsOptions));
 
 app.use(bodyParser.urlencoded({ extended: true }));
@@ -50,6 +54,46 @@ app.use(session({
 app.use(logger('tiny'));
 app.use(fileupload());
 
+// Passport configuration
+passport.use(new LocalStrategy(
+    { usernameField: 'email' },
+    async function (email, password, done) {
+        try {
+            const user = await User.findOne({ email });
+
+            if (!user) {
+                return done(null, false, { message: 'Incorrect email.' });
+            }
+
+            const isValidPassword = await user.isValidPassword(password);
+
+            if (!isValidPassword) {
+                return done(null, false, { message: 'Incorrect password.' });
+            }
+
+            return done(null, user);
+        } catch (error) {
+            return done(error);
+        }
+    }
+));
+
+passport.serializeUser(function (user, done) {
+    done(null, user.id);
+});
+
+passport.deserializeUser(async function (id, done) {
+    try {
+        const user = await User.findById(id);
+        done(null, user);
+    } catch (error) {
+        done(error);
+    }
+});
+
+app.use(passport.initialize());
+app.use(passport.session());
+
 // Routes
 app.get('/', (req, res) => {
     res.send('Hello');
@@ -64,10 +108,16 @@ app.get("/api/getkey", (req, res) =>
     res.status(200).json({ key: process.env.RAZORPAY_API_KEY })
 );
 
+// Authentication routes
+app.post('/login',
+    passport.authenticate('local', { failureRedirect: '/login' }),
+    function (req, res) {
+        res.redirect('/');
+    });
+
 app.all("*", (req, res, next) => {
     res.status(404).send('404 - Not Found');
 });
-
 
 // Server listening
 app.listen(PORT, () => {

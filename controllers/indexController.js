@@ -17,36 +17,41 @@ const {paymentInitialisation} = require('./paymentController');
 const {v4: uuidv4 } = require('uuid');
 const Store=require('../models/StoreStock')
 const axios=require('axios')
+const jwt=require('jsonwebtoken')
 exports.currentUser = catchAsyncErrors(async (req, res, next) => {
     try {
-        console.log(req);
+        // Check if token is available in the Authorization header
+        const authHeader = req.headers.authorization;
 
-        // Retrieve user ID from the request object (set by the isAuthenticated middleware)
-        const userId = req.id;
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+            return res.status(401).json({ success: false, message: 'User not authenticated' });
+        }
 
-        // Find the user in the database based on the ID
+        const token = authHeader.split(' ')[1];
+
+        // Verify the token and extract user ID
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const userId = decoded.id;
+
         const user = await User.findById(userId);
 
         if (!user) {
             return res.status(404).json({ success: false, message: 'User not found' });
         }
 
-        // Set isAuth property if needed
         user.isAuth = true;
 
-        // Update the last login time to the current time
         user.lastLogin = new Date();
 
-        // Save the user document with the updated lastLogin time
         await user.save();
 
-        // Send user data in the response
         res.json({ success: true, user });
     } catch (error) {
         console.error('Error fetching current user:', error);
         res.status(500).json({ success: false, message: 'Internal server error' });
     }
 });
+
 
 
 exports.signUp = catchAsyncErrors(async (req, res, next) => {
@@ -177,13 +182,6 @@ exports.addToWishlist = catchAsyncErrors(async (req, res, next) => {
             return res.status(403).json({ success: false, message: 'Only customers can add products to the wishlist' });
         }
 
-        if (!mongoose.Types.ObjectId.isValid(productId)) {
-            return res.status(400).json({ success: false, message: 'Invalid product ID' });
-        }
-        if (!mongoose.Types.ObjectId.isValid(userId)) {
-            return res.status(400).json({ success: false, message: 'Invalid user ID' });
-        }
-
         let wishlist = await Wishlist.findOne({ user: userId });
 
         if (!wishlist) {
@@ -201,6 +199,7 @@ exports.addToWishlist = catchAsyncErrors(async (req, res, next) => {
         next(error);
     }
 });
+
 
 exports.fetchWishlist = catchAsyncErrors(async (req, res, next) => {
     try {
@@ -252,11 +251,12 @@ exports.fetchProducts = catchAsyncErrors(async (req, res, next) => {
 });
 
 
+
 exports.addToCart = catchAsyncErrors(async (req, res, next) => {
     try {
         const { productId, quantity } = req.body;
-        const userId = req.params.userId;
-
+        const userId = req.id;  // Use authenticated user's ID
+console.log(userId)
         const user = await User.findById(userId);
         if (!user || user.userType !== 'customer') {
             return res.status(403).json({ success: false, message: 'Only customers can add products to the cart' });
@@ -299,6 +299,8 @@ exports.addToCart = catchAsyncErrors(async (req, res, next) => {
         next(error);
     }
 });
+
+
 
 
 exports.updateCart = catchAsyncErrors(async (req, res, next) => {
@@ -362,42 +364,39 @@ exports.updateCart = catchAsyncErrors(async (req, res, next) => {
 
 
 
-
 exports.deleteFromCart = catchAsyncErrors(async (req, res, next) => {
     try {
-        const userId = req.params.userId;
-        const productId = req.params.productId;
+        const { userId, productId } = req.params;
+
+        if (!mongoose.Types.ObjectId.isValid(userId) || !mongoose.Types.ObjectId.isValid(productId)) {
+            return res.status(400).json({ success: false, message: 'Invalid user ID or product ID' });
+        }
+
         const user = await User.findById(userId);
         if (!user || user.userType !== 'customer') {
-            return res.status(403).json({ success: false, message: 'Only customers can add products to the cart' });
+            return res.status(403).json({ success: false, message: 'Only customers can remove products from the cart' });
         }
-        // Find the cart for the user
-        const cart = await Cart.findOne({ user: userId });
 
+        const cart = await Cart.findOne({ user: userId });
         if (!cart) {
             return res.status(404).json({ success: false, message: 'Cart not found for this user' });
         }
 
-        // Find the index of the product in the cart's products array
         const productIndex = cart.products.findIndex(product => product._id.toString() === productId);
-
-        // Check if the product exists in the cart
         if (productIndex === -1) {
             return res.status(404).json({ success: false, message: 'Product not found in the cart' });
         }
 
-        // Remove the product from the cart's products array
         cart.products.splice(productIndex, 1);
 
-        // Recalculate the totalGrandPrice
         cart.totalGrandPrice = cart.products.reduce((total, product) => total + product.totalPrice, 0);
 
-        // Save the updated cart
         await cart.save();
 
         res.status(200).json({ success: true, message: 'Product removed from cart successfully', data: cart });
     } catch (error) {
-        next(error);
+        console.error('Error removing product from cart:', error);
+        res.status(500).json({ success: false, message: 'Internal server error' });
     }
 });
 
@@ -419,15 +418,24 @@ exports.returnRequest = catchAsyncErrors(async (req, res, next) => {
 exports.fetchCartProducts = catchAsyncErrors(async (req, res, next) => {
     try {
         const userId = req.params.userId;
+
+        // Check if userId is a valid ObjectId
+        if (!mongoose.Types.ObjectId.isValid(userId)) {
+            return res.status(400).json({ success: false, message: 'Invalid user ID' });
+        }
+
+        // Find the cart for the given user and populate product details
         const cart = await Cart.findOne({ user: userId }).populate('products.productId');
 
         if (!cart) {
             return res.status(404).json({ success: false, message: 'Cart not found for this user' });
         }
 
+        // Send the cart data in the response
         res.status(200).json({ success: true, cart });
     } catch (error) {
-        next(error);
+        console.error('Error fetching cart products:', error);
+        res.status(500).json({ success: false, message: 'Internal Server Error' });
     }
 });
 
@@ -475,12 +483,18 @@ exports.userresetpassword = catchAsyncErrors(async (req, res, next) => {
 
 exports.addAddress = catchAsyncErrors(async (req, res, next) => {
     try {
-        const userId = req.id; // Assuming you have user ID stored in req.user after authentication
+        const userId = req.id; // Assuming you have user ID stored in req.id after authentication
         const formData = req.body.formData;
-        const user = await User.findById(userId)
-        if (!user || user.userType !== 'customer') {
-            return res.status(403).json({ success: false, message: 'Only customers can remove address' });
+
+        if (!userId) {
+            return res.status(401).json({ success: false, message: 'User not authenticated' });
         }
+
+        const user = await User.findById(userId);
+        if (!user || user.userType !== 'customer') {
+            return res.status(403).json({ success: false, message: 'Only customers can add address' });
+        }
+
         const addressData = {
             fullName: formData.fullName,
             addressLine1: formData.addressLine1,
@@ -490,11 +504,6 @@ exports.addAddress = catchAsyncErrors(async (req, res, next) => {
             postalCode: formData.postalCode,
             phone: formData.phone
         };
-
-
-        if (!user) {
-            return res.status(404).json({ success: false, message: 'User not found' });
-        }
 
         // Push the new address data to the user's address array
         user.address.push(addressData);
@@ -537,8 +546,7 @@ exports.updateUser = catchAsyncErrors(async (req, res, next) => {
     }
 });
 
-
-exports.deleteAddress =catchAsyncErrors( async (req, res) => {
+exports.deleteAddress = catchAsyncErrors(async (req, res) => {
     try {
         const userId = req.params.userId;
         const addressIndex = req.params.index;
@@ -567,6 +575,7 @@ exports.deleteAddress =catchAsyncErrors( async (req, res) => {
         return res.status(500).json({ success: false, message: 'Internal Server Error' });
     }
 });
+
 
 async function sendMailHandler(email, pdfUrl) {
     console.log(pdfUrl);
@@ -623,7 +632,7 @@ async function sendMailHandler(email, pdfUrl) {
     }
 }
 
-exports.userOrder = catchAsyncErrors(async (req, res, next) => {
+exports.userOrder = catchAsyncErrors(async (req, res) => {
     try {
         // Extract the userId from the request params
         const { userId } = req.params;
@@ -635,7 +644,6 @@ exports.userOrder = catchAsyncErrors(async (req, res, next) => {
 
         // Extract the checkOutCart, totalGrandPrice, and other details from the request body
         const { checkOutCart, totalGrandPrice, email, paymentType, orderId, invoiceNumber } = req.body;
-        console.log(req.body);
 
         // Ensure checkOutCart, totalGrandPrice, email, and paymentType are provided
         if (!checkOutCart || !totalGrandPrice || !email || !paymentType) {
@@ -650,8 +658,6 @@ exports.userOrder = catchAsyncErrors(async (req, res, next) => {
             return res.status(400).json({ success: false, message: 'Invalid JSON format for checkout cart' });
         }
 
-        console.log(products);
-
         // Validate products format (ensure it's an array of objects)
         if (!Array.isArray(products) || !products.every(item => typeof item === 'object' && item.productId && item.quantity && item.totalPrice && item.store)) {
             return res.status(400).json({ success: false, message: 'Invalid products format' });
@@ -662,8 +668,6 @@ exports.userOrder = catchAsyncErrors(async (req, res, next) => {
             const { productId, quantity, totalPrice, store } = item;
             return { productId, quantity, totalPrice, store };
         });
-
-        console.log(req.files);
 
         // Handle the PDF file upload to ImageKit
         let pdfUrl = '';
@@ -683,7 +687,7 @@ exports.userOrder = catchAsyncErrors(async (req, res, next) => {
             userId: userId, // Set the user reference directly from req.params
             totalGrandPrice, // Set the totalGrandPrice
             PaymentType: paymentType, // Set the payment type
-            pdfUrl ,// Set the PDF URL
+            pdfUrl,// Set the PDF URL
             OrderId: orderId,
             InvoiceNumber: invoiceNumber
         });
@@ -761,6 +765,11 @@ exports.fetchUserOrder = catchAsyncErrors(async (req, res, next) => {
         // Extract the userId from the request params
         const { userId } = req.params;
 
+        // const token = req.headers.authorization.split(' ')[1];
+        // if (!token) {
+        //     return res.status(401).json({ success: false, message: 'User not authenticated' });
+        // }
+
         // Fetch the user's order and populate the productId and userId fields
         const userOrder = await Order.find({ userId: userId })
             .populate('products.productId')
@@ -774,6 +783,7 @@ exports.fetchUserOrder = catchAsyncErrors(async (req, res, next) => {
         res.status(500).json({ success: false, message: 'Internal server error' });
     }
 });
+
 
 exports.contactUs = catchAsyncErrors(async (req, res, next) => {
     try {
@@ -798,57 +808,89 @@ exports.contactUs = catchAsyncErrors(async (req, res, next) => {
 
 
 exports.setPreferredStore = catchAsyncErrors(async (req, res, next) => {
-    console.log(req.body)
-    const { userId } = req.params;
-    const { selectedStore } = req.body;
-    const user = await User.findById(userId);
-console.log(user)
-    if (!user) {
-        return res.status(404).json({ success: false, message: 'User not found' });
-    }
-
-    user.PreferredStore = selectedStore;
-    await user.save();
-
-    res.status(200).json({ success: true, message: 'Preferred store set successfully' });
-});
-
-exports.setAddressIndex = async (req, res, next) => {
     try {
         const { userId } = req.params;
-        const { addressIndex } = req.body;
+        const { selectedStore } = req.body;
 
-        // Validate addressIndex
-        if (!Number.isInteger(addressIndex) || addressIndex < 0) {
-            return res.status(400).json({ success: false, message: 'Invalid address index' });
-        }
+        // Extract the token from the request headers
+        // const token = req.headers.authorization.split(' ')[1];
+
+        // // Verify the token
+        // const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        // if (!decoded || decoded.id !== userId) {
+        //     return res.status(401).json({ success: false, message: 'Unauthorized' });
+        // }
 
         const user = await User.findById(userId);
-
-        // Check if the user exists
         if (!user) {
             return res.status(404).json({ success: false, message: 'User not found' });
         }
 
-        if (addressIndex >= user.address.length) {
+        user.PreferredStore = selectedStore;
+        await user.save();
+
+        res.status(200).json({ success: true, message: 'Preferred store set successfully' });
+    } catch (error) {
+        next(error);
+    }
+});
+
+
+exports.selectAddressIndex = catchAsyncErrors(async (req, res, next) => {
+    try {
+        const userId = req.params.userId;
+        const { addressIndex } = req.body.index; // Extract addressIndex from req.body.index
+        console.log(req.body, req.params);
+
+        // Extract the token from the request headers
+        // const token = req.headers.authorization.split(' ')[1];
+        // console.log(token);
+
+        // // Verify the token
+        // const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        // if (!decoded || decoded.id !== userId) {
+        //     return res.status(401).json({ success: false, message: 'Unauthorized' });
+        // }
+
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ success: false, message: 'User not found' });
+        }
+
+        // Assuming you have an array of addresses in your user schema
+        if (addressIndex < 0 || addressIndex >= user.address.length) {
             return res.status(400).json({ success: false, message: 'Invalid address index' });
         }
 
-        user.selectedAddressIndex = addressIndex;
+        user.selectedAddressIndex = addressIndex; // Assign the extracted addressIndex
         await user.save();
 
-        res.status(200).json({ success: true, message: 'Address index updated successfully' ,user});
+        res.status(200).json({ success: true, message: 'Address index set successfully' });
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ success: false, message: 'Internal Server Error' });
+        next(error);
     }
-};
+});
+
+
+
+
+
 
 exports.clearCart = catchAsyncErrors(async (req, res, next) => {
     try {
+        const authHeader = req.headers.authorization;
+
+        if (!authHeader || !authHeader.startsWith('Bearer')) {
+            return res.status(401).json({ success: false, message: 'User not authenticated' });
+        }
+
+        const token = authHeader.split(' ')[1];
+
+        const userId = req.body.userId;
+
         // Assuming Cart is your Mongoose model
         await Cart.findOneAndUpdate(
-            { user: req.body.userId },
+            { user: userId },
             { $set: { products: [], totalGrandPrice: 0 } }, // Resetting the cart's products and total price
             { new: true }
         );
@@ -867,6 +909,7 @@ exports.clearCart = catchAsyncErrors(async (req, res, next) => {
         });
     }
 });
+
 
 
 

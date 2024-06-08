@@ -1,5 +1,5 @@
 const express = require('express')
-const { currentUser, signUp, login, logout, updateUser, updateCart, deleteUser, doPayment, updateProductQuantity,setAddressIndex, returnRequest, deleteAddress, addAddress, addToWishlist, fetchWishlist, deleteFromWishlist, fetchProducts, addToCart, deleteFromCart, fetchCartProducts, userforgetlink, userSendMail, userOrder, fetchUserOrder, contactUs, setPreferredStore, clearCart } = require('../controllers/indexController')
+const { currentUser, signUp, login, logout, updateUser, updateCart, deleteUser, doPayment, updateProductQuantity,setAddressIndex, returnRequest, deleteAddress, addAddress, addToWishlist, fetchWishlist, deleteFromWishlist, fetchProducts, addToCart, deleteFromCart, fetchCartProducts, userforgetlink, userSendMail, userOrder, fetchUserOrder, contactUs, setPreferredStore, clearCart, selectAddressIndex } = require('../controllers/indexController')
 const { isAuthenticated } = require('../middlewares/auth')
 const { checkout, paymentVerification } = require('../controllers/paymentController')
 const router = express.Router()
@@ -49,7 +49,7 @@ router.post('/order/returnRequest/:orderId',isAuthenticated,returnRequest)
 
 router.post('/contactus',contactUs)
 
-router.post('/:userId/setAddressIndex',isAuthenticated,setAddressIndex)
+router.post('/:userId/setAddressIndex',isAuthenticated,selectAddressIndex)
 
 router.post('/updatecart',isAuthenticated,updateCart)
 
