@@ -6,6 +6,7 @@ const bcrypt = require('bcryptjs');
 const ErrorHandler = require('../utils/ErrorHandler');
 const { sendmail } = require('../utils/nodemailer');
 const StoreStock =require('../models/StoreStock')
+const jwt=require('jsonwebtoken')
 exports.storeRegister = catchAsyncErrors(async (req, res, next) => {
     try {
         // console.log(req.body)
@@ -73,21 +74,37 @@ exports.storeLogin = catchAsyncErrors(async (req, res, next) => {
 
 exports.currentStoreManager = catchAsyncErrors(async (req, res, next) => {
     try {
-        console.log("======", req.id)
-        const storemanger = await Store.findById(req.id).exec();
-        console.log("=====:", storemanger)
-        storemanger.isAuth = true
-        if (!storemanger) {
-            return res.status(404).json({ success: false, message: "User not found" });
+        // Check if token is available in the Authorization header
+        const authHeader = req.headers.authorization;
+
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+            return res.status(401).json({ success: false, message: 'User not authenticated' });
         }
-        res.json({ success: true, storemanger });
+
+        const token = authHeader.split(' ')[1];
+
+        // Verify the token and extract user ID
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const userId = decoded.id;
+console.log(userId)
+        const user = await Store.findById(userId);
+console.log(user)
+        if (!user) {
+            return res.status(404).json({ success: false, message: 'User not found' });
+        }
+
+        user.isAuth = true;
+
+        user.lastLogin = new Date();
+
+        await user.save();
+
+        res.json({ success: true, user });
     } catch (error) {
-        console.error("Error fetching current manager:", error);
-        res.status(500).json({ success: false, message: "Internal server error" });
+        console.error('Error fetching current user:', error);
+        res.status(500).json({ success: false, message: 'Internal server error' });
     }
 });
-
-
 
 exports.logoutStoreManager = catchAsyncErrors(async (req, res, next) => {
     res.clearCookie("token")
