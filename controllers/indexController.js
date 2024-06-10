@@ -95,6 +95,11 @@ exports.login = catchAsyncErrors(async (req, res, next) => {
             return res.status(404).json({ message: 'User not found' });
         }
 
+        // Check if the user is blocked
+        if (user.blocked) {
+            return res.status(401).json({ message: 'Your account is blocked. Please contact support.' });
+        }
+
         // Check if the password matches
         const isPasswordMatch = await user.comparePassword(password);
 
@@ -110,6 +115,7 @@ exports.login = catchAsyncErrors(async (req, res, next) => {
         res.status(500).json({ message: 'Internal server error' });
     }
 });
+
 
 
 exports.logout = catchAsyncErrors(async (req, res, next) => {
