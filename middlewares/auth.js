@@ -4,7 +4,7 @@ const { catchAsyncErrors } = require('./catchAsyncError');
 
 exports.isAuthenticated = catchAsyncErrors(async (req, res, next) => {
     const authHeader = req.headers.authorization;
-
+console.log(authHeader)
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
         return next(new ErrorHandler("Login first to access this resource", 401));
     }

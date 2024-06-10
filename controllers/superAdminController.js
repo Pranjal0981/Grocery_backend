@@ -122,6 +122,8 @@ exports.fetchAllUsers = catchAsyncErrors(async (req, res, next) => {
 
 exports.blockMembers = catchAsyncErrors(async (req, res, next) => {
     try {
+        const authHeader = req.headers.authorization;
+console.log("====",authHeader)
         const memberId = req.params.userId; // Assuming memberId is passed as a parameter in the request
         const updatedUser = await User.findByIdAndUpdate(memberId, { blocked: true }, { new: true });
 
