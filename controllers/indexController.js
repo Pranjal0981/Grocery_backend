@@ -333,7 +333,7 @@ exports.updateCart = catchAsyncErrors(async (req, res, next) => {
                 storeProducts[productId] = storeProduct;
             }
         }
-
+        console.log(unavailableProducts)
         if (unavailableProducts.length > 0) {
             return res.status(400).json({
                 success: false,
