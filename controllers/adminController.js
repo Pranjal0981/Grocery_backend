@@ -233,6 +233,7 @@ exports.deleteProduct = catchAsyncErrors(async (req, res, next) => {
 exports.fetchOrders = catchAsyncErrors(async (req, res, next) => {
     try {
         const { store } = req.params;
+        console.log(store)
         const page = parseInt(req.query.page) || 1;
         const limit = 10;
         const skip = (page - 1) * limit;
@@ -241,17 +242,10 @@ exports.fetchOrders = catchAsyncErrors(async (req, res, next) => {
         let totalCount;
 
         if (store) {
-            // Find all store stocks for the given store name
-            const storeStocks = await Store.find({ storeName: store });
-
-            // Extract productIds from the store stocks found
-            const productIds = storeStocks.map(stock => stock.productId);
-
             // Find orders that have products belonging to the given store
-            orders = await Order.find({ 'products.productId': { $in: productIds } })
+            orders = await Order.find({ 'products.store': store })
                 .populate({
                     path: 'products.productId',
-                    match: { _id: { $in: productIds } },
                     select: 'productName description MRP category brand purchasePrice sellingPrice image gst cgst productCode size'
                 })
                 .populate('userId')
@@ -260,7 +254,7 @@ exports.fetchOrders = catchAsyncErrors(async (req, res, next) => {
                 .limit(limit);
 
             // Count total number of orders for pagination
-            totalCount = await Order.countDocuments({ 'products.productId': { $in: productIds } });
+            totalCount = await Order.countDocuments({ 'products.store': store });
         } else {
             // Fetch all orders if store is not provided
             orders = await Order.find({})
