@@ -225,7 +225,7 @@ exports.fetchInfoForDashboard = catchAsyncErrors(async (req, res, next) => {
         // Calculate active users in the last hour
         const oneHourAgo = new Date();
         oneHourAgo.setHours(oneHourAgo.getHours() - 1);
-        const activeUsersByHour = await User.countDocuments({ lastLogin: { $gte: oneHourAgo } }).maxTimeMS(20000);
+        const activeUsersByHour = await User.find({ lastLogin: { $gte: oneHourAgo } }).maxTimeMS(20000);
 
         // Calculate inactive users in the last 7 days
         const oneDayAgo = new Date();
@@ -291,7 +291,7 @@ exports.fetchInfoForDashboard = catchAsyncErrors(async (req, res, next) => {
             data: {
                 totalMembers,
                 totalBlockedMembers,
-                activeUsersByHour,
+                activeUsersByHour: activeUsersByHour.length,
                 inactiveUsersIn7Days,
                 totalProfit: totalProfit.length > 0 ? totalProfit[0].totalProfit : 0,
                 pendingOrdersCount,
@@ -307,8 +307,6 @@ exports.fetchInfoForDashboard = catchAsyncErrors(async (req, res, next) => {
         });
     }
 });
-
-
 
 
 exports.searchUser = catchAsyncErrors(async (req, res, next) => {

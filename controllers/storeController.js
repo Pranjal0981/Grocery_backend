@@ -86,22 +86,21 @@ exports.currentStoreManager = catchAsyncErrors(async (req, res, next) => {
         // Verify the token and extract user ID
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
         const userId = decoded.id;
-console.log(userId)
-        const user = await Store.findById(userId);
-console.log(user)
+
+        const user = await Store.findById(userId).exec();
+
         if (!user) {
             return res.status(404).json({ success: false, message: 'User not found' });
         }
 
         user.isAuth = true;
-
         user.lastLogin = new Date();
 
         await user.save();
 
         res.json({ success: true, user });
     } catch (error) {
-        console.error('Error fetching current user:', error);
+        console.error('Error fetching current admin:', error);
         res.status(500).json({ success: false, message: 'Internal server error' });
     }
 });
