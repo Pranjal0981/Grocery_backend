@@ -282,31 +282,41 @@ exports.fetchByBrand = catchAsyncErrors(async (req, res, next) => {
 exports.updateProductStock = catchAsyncErrors(async (req, res, next) => {
     try {
         const { productId } = req.params;
-        const { newStock,store } = req.body;
-console.log(req.body)
-        // Validate the productId, storeName, and stock
-        if (!mongoose.Types.ObjectId.isValid(productId) || isNaN(newStock) || newStock < 0) {
-            return res.status(400).json({ success: false, message: 'Invalid productId or stock value' });
+        const { newStock, store } = req.body;
+
+        // Validate the productId and store
+        if (!mongoose.Types.ObjectId.isValid(productId)) {
+            return res.status(400).json({ success: false, message: 'Invalid productId' });
+        }
+
+        if (!store) {
+            return res.status(400).json({ success: false, message: 'Store name is required' });
+        }
+
+        // Ensure newStock is a number and non-negative
+        let updatedStock = parseInt(newStock, 10);
+        if (isNaN(updatedStock) || updatedStock < 0) {
+            updatedStock = 0;
         }
 
         const product = await Product.findById(productId);
-
         if (!product) {
             return res.status(404).json({ success: false, message: 'Product not found' });
         }
 
-        let storeStock = await Store.findOne({ productId, storeName:store });
-
+        let storeStock = await Store.findOne({ productId, storeName: store });
         if (!storeStock) {
             return res.status(404).json({ success: false, message: 'Store stock not found' });
         }
 
         // Update the stock for the existing store stock
-        storeStock.stock = newStock;
+        storeStock.stock = updatedStock;
 
         // Save the store stock
         await storeStock.save();
-        await Cart.updateMany({ 'products.productId': productId }, { $set: { 'products.$.stock': newStock } });
+
+        // Update the stock in all cart products
+        await Cart.updateMany({ 'products.productId': productId }, { $set: { 'products.$.stock': updatedStock } });
 
         // Send a success response
         res.status(200).json({ success: true, message: 'Product stock updated successfully', product, storeStock });
