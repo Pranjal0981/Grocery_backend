@@ -52,7 +52,44 @@ exports.currentUser = catchAsyncErrors(async (req, res, next) => {
     }
 });
 
+// exports.copyStore = catchAsyncErrors(async (req, res, next) => {
+//     // const { sourceStoreName } = req.body; // Assuming you get the source store name from the request body
+//     const destinationStoreName = "Gulmohar"; // Destination store is always "AwadhPuri"
 
+//     try {
+//         // Find all stock records of the products in the source store
+//         const sourceStocks = await Store.find({ storeName: "Jhansi" });
+
+//         if (!sourceStocks || sourceStocks.length === 0) {
+//             return res.status(404).json({ success: false, message: `No stocks found in the source store: Katara Hills.` });
+//         }
+
+//         // Iterate through each product stock in the source store
+//         for (const sourceStock of sourceStocks) {
+//             // Find the stock record of the product in the destination store
+//             const destinationStock = await Store.findOne({ storeName: destinationStoreName, productId: sourceStock.productId });
+
+//             // If destination stock exists, update its quantity
+//             if (destinationStock) {
+//                 destinationStock.stock += sourceStock.stock; // Add the stock from the source store
+//                 await destinationStock.save();
+//             } else {
+//                 // If destination stock doesn't exist, create a new stock record
+//                 const newStock = new Store({
+//                     productId: sourceStock.productId,
+//                     storeName: destinationStoreName,
+//                     stock: sourceStock.stock, // Copying stock quantity
+//                 });
+//                 await newStock.save();
+//             }
+//         }
+
+//         res.status(200).json({ success: true, message: `All product stocks copied successfully from Jhansi to Rohit Nagar` });
+//     } catch (error) {
+//         console.error('Error copying product stocks:', error);
+//         res.status(500).json({ success: false, message: 'Error copying product stocks.' });
+//     }
+// });
 
 exports.signUp = catchAsyncErrors(async (req, res, next) => {
     try {
@@ -255,7 +292,6 @@ exports.fetchProducts = catchAsyncErrors(async (req, res, next) => {
         next(error);
     }
 });
-
 
 
 exports.addToCart = catchAsyncErrors(async (req, res, next) => {

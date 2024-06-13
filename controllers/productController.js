@@ -183,8 +183,6 @@ console.log(storeStocks)
 
 
 
-
-
 exports.fetchProductByStore = catchAsyncErrors(async (req, res, next) => {
     try {
         let { store } = req.params;

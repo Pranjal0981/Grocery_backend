@@ -230,6 +230,45 @@ exports.deleteProduct = catchAsyncErrors(async (req, res, next) => {
 });
 
 
+// exports.copyAllProductStocksFromAnotherStore = catchAsyncErrors(async (req, res, next) => {
+//     const { sourceStoreName } = req.body; // Assuming you get the source store name from the request body
+//     const destinationStoreName = "AwadhPuri"; // Destination store is always "AwadhPuri"
+
+//     try {
+//         // Find all stock records of the products in the source store
+//         const sourceStocks = await StoreStock.find({ storeName: sourceStoreName });
+
+//         if (!sourceStocks || sourceStocks.length === 0) {
+//             return res.status(404).json({ success: false, message: `No stocks found in the source store: ${sourceStoreName}.` });
+//         }
+
+//         // Iterate through each product stock in the source store
+//         for (const sourceStock of sourceStocks) {
+//             // Find the stock record of the product in the destination store
+//             const destinationStock = await StoreStock.findOne({ storeName: destinationStoreName, productId: sourceStock.productId });
+
+//             // If destination stock exists, update its quantity
+//             if (destinationStock) {
+//                 destinationStock.stock += sourceStock.stock; // Add the stock from the source store
+//                 await destinationStock.save();
+//             } else {
+//                 // If destination stock doesn't exist, create a new stock record
+//                 const newStock = new StoreStock({
+//                     productId: sourceStock.productId,
+//                     storeName: destinationStoreName,
+//                     stock: sourceStock.stock, // Copying stock quantity
+//                 });
+//                 await newStock.save();
+//             }
+//         }
+
+//         res.status(200).json({ success: true, message: `All product stocks copied successfully from ${sourceStoreName} to ${destinationStoreName}.` });
+//     } catch (error) {
+//         console.error('Error copying product stocks:', error);
+//         res.status(500).json({ success: false, message: 'Error copying product stocks.' });
+//     }
+// });
+
 exports.fetchOrders = catchAsyncErrors(async (req, res, next) => {
     try {
         const { store } = req.params;
