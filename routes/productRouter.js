@@ -3,7 +3,7 @@ const router = express.Router()
 const { isAuthenticated } = require('../middlewares/auth')
 const { exploreProductById, filterCatProduct, getStoresByProductId, fetchByBrand, updateProductStock, fetchProductByStore, getProducts, searchProducts, filterAll } = require('../controllers/productController')
 
-router.get('/getproduct', getProducts)
+router.get('/getproduct', getProducts);
 
 router.get('/category/:category', filterCatProduct);
 

@@ -14,16 +14,18 @@ exports.getProducts = catchAsyncErrors(async (req, res, next) => {
     try {
         let query = {}; // Initialize an empty query object
 
-        // Check if the preferred store is provided in the request
         if (req.query.preferredStore) {
-            // If preferred store is provided, filter products by that store from the StoreStock schema
+            // If the user has a preferred store, filter products by that store from the StoreStock schema
             const storeStocks = await Store.find({ storeName: req.query.preferredStore });
             const productIds = storeStocks.map(store => store.productId);
             query = { _id: { $in: productIds } }; // Filter by productIds array
         }
 
-        // If preferred store not provided, return all products without filtering
-        const totalCount = req.query.preferredStore ? await Product.countDocuments(query) : await Product.countDocuments(query); // Total number of products matching the query
+        // If the user is not authenticated or does not have a preferred store, return all products without filtering
+        const totalCount = req.query.preferredStore ?
+            await Product.countDocuments(query) :
+            await Product.countDocuments(); // Total number of products matching the query
+
         const totalPages = Math.ceil(totalCount / limit); // Total number of pages
 
         const productsWithStores = await Product.aggregate([
@@ -37,58 +39,81 @@ exports.getProducts = catchAsyncErrors(async (req, res, next) => {
                     foreignField: 'productId', // Field from the StoreStock collection
                     as: 'stores' // Output array field
                 }
-            },
-            {
-                $addFields: {
-                    totalPages: totalPages // Add totalPages to each document
-                }
-            },
-            {
-                $project: {
-                    totalPages: 0 // Exclude totalPages from the output
-                }
-            },
-            {
-                $skip: (page - 1) * limit // Skip products based on page number
-            },
-            {
-                $limit: limit // Limit the number of products per page
             }
         ]);
 
+        const products = productsWithStores.map(product => {
+            return product;
+        });
+
         res.status(200).json({
-            data: productsWithStores
+            success: true,
+            count: products.length,
+            totalPages,
+            products
         });
     } catch (error) {
-        // Handle any errors that occur during fetching data
-        return next(new ErrorHandler(error.message, 500));
+        next(error);
     }
 });
+
 
 
 
 exports.filterCatProduct = catchAsyncErrors(async (req, res, next) => {
     try {
         const { category } = req.params;
-        const page = req.query.page || 1;
+        if (!category) {
+            return res.status(400).json({
+                success: false,
+                error: "Category parameter is required."
+            });
+        }
+
+        const page = parseInt(req.query.page) || 1;
         const limit = 12;
         const skip = (page - 1) * limit;
+
         // Use a case-insensitive regular expression for the category
         const categoryRegex = new RegExp(category, 'i');
         const products = await Product.find({ category: categoryRegex })
             .skip(skip)
             .limit(limit);
+
+        // Fetch stock information for all products from all stores
+        const productIds = products.map(product => product._id);
+        const storeStocks = await Store.find({ productId: { $in: productIds } });
+
+        // Group store stocks by productId
+        const stockByProduct = storeStocks.reduce((acc, stock) => {
+            const productId = stock.productId.toString();
+            if (!acc[productId]) {
+                acc[productId] = [];
+            }
+            acc[productId].push(stock);
+            return acc;
+        }, {});
+
+        // Add stock information to the products
+        const productsWithStock = products.map(product => {
+            const stores = stockByProduct[product._id.toString()] || [];
+            const totalStock = stores.reduce((total, stock) => total + stock.stock, 0);
+            const outOfStock = totalStock <= 0;
+            return { ...product.toObject(), stores, outOfStock, totalStock };
+        });
+
         const totalProducts = await Product.countDocuments({ category: categoryRegex });
-        console.log(products)
         const totalPages = Math.ceil(totalProducts / limit);
+
         res.status(200).json({
             success: true,
             count: products.length,
             totalPages: totalPages,
             currentPage: page,
-            data: products
+            data: productsWithStock
         });
     } catch (error) {
+        console.error(error);
         res.status(500).json({
             success: false,
             error: error.message
@@ -98,20 +123,15 @@ exports.filterCatProduct = catchAsyncErrors(async (req, res, next) => {
 
 
 
+
 exports.searchProducts = catchAsyncErrors(async (req, res, next) => {
     let { searchTerm, category, store } = req.query;
 
     try {
         let query = {};
 
-        // Convert store to lowercase for case-insensitive search
-        // if (store) {
-        //     store = store.toLowerCase();
-        // }
-
         // Construct the MongoDB query based on the provided search parameters
         if (searchTerm) {
-            // If searchTerm is provided, search for products matching the productName or description
             query.$or = [
                 { productName: { $regex: searchTerm, $options: 'i' } },
                 { description: { $regex: searchTerm, $options: 'i' } }
@@ -119,27 +139,46 @@ exports.searchProducts = catchAsyncErrors(async (req, res, next) => {
         }
 
         if (category && category !== 'All categories') {
-            // If category is provided and it's not 'All categories', include category filter
             query.category = category;
         }
 
         // Perform the search query
         let products = await Product.find(query);
 
-        if (store) {
-            // If store is provided, filter products by store availability
-            const productIds = products.map(product => product._id);
-            const storeStocks = await Store.find({ productId: { $in: productIds }, storeName: store });
+        // Fetch stock information for all products from all stores
+        const productIds = products.map(product => product._id);
+        const storeStocks = await Store.find({ productId: { $in: productIds } });
 
-            const availableProductIds = storeStocks.map(stock => stock.productId.toString());
-            products = products.filter(product => availableProductIds.includes(product._id.toString()));
+        // Group store stocks by productId
+        const stockByProduct = storeStocks.reduce((acc, stock) => {
+            const productId = stock.productId.toString();
+            if (!acc[productId]) {
+                acc[productId] = [];
+            }
+            acc[productId].push(stock);
+            return acc;
+        }, {});
 
-            // Add stock information to the products
-            products = products.map(product => {
-                const stock = storeStocks.find(stock => stock.productId.toString() === product._id.toString());
-                return { ...product.toObject(), stock: stock ? stock.stock : 0 };
-            });
-        }
+        // Add stock information to the products
+        products = products.map(product => {
+            const stores = stockByProduct[product._id.toString()] || [];
+            return { ...product.toObject(), stores };
+        });
+
+        // Add outOfStock flag based on the preferred store or total stock
+        products = products.map(product => {
+            if (store) {
+                const storeStock = product.stores.find(stock => stock.storeName === store);
+                const outOfStock = !(storeStock && storeStock.stock > 0);
+                return { ...product, outOfStock, stock: storeStock ? storeStock.stock : 0 };
+            } else {
+                const totalStock = product.stores.reduce((total, stock) => total + stock.stock, 0);
+                const outOfStock = totalStock <= 0;
+                return { ...product, outOfStock, stock: totalStock };
+            }
+        });
+
+        console.log(products);
 
         // Send response with search results
         res.status(200).json({
@@ -148,7 +187,6 @@ exports.searchProducts = catchAsyncErrors(async (req, res, next) => {
             products: products
         });
     } catch (error) {
-        // Handle errors
         console.error(error);
         res.status(500).json({ success: false, error: 'Internal Server Error' });
     }
@@ -218,6 +256,8 @@ exports.fetchProductByStore = catchAsyncErrors(async (req, res, next) => {
         });
     }
 });
+
+
 exports.filterAll = catchAsyncErrors(async (req, res, next) => {
     try {
         let query = {};
@@ -225,13 +265,6 @@ exports.filterAll = catchAsyncErrors(async (req, res, next) => {
         // Filter by brand (case insensitive)
         if (req.query.brand) {
             query.brand = { $regex: new RegExp(req.query.brand, 'i') };
-        }
-
-        // Filter by store
-        if (req.query.store) {
-            const storeStock = await Store.find({ storeName: req.query.store });
-            const productIds = storeStock.map(stock => stock.productId);
-            query._id = { $in: productIds };
         }
 
         // Filter by price range
@@ -245,12 +278,53 @@ exports.filterAll = catchAsyncErrors(async (req, res, next) => {
             }
         }
 
-        const filteredProducts = await Product.find(query);
+        // Fetch the filtered products
+        let filteredProducts = await Product.find(query);
+
+        if (filteredProducts.length === 0) {
+            // Send an empty array if no products are found
+            return res.status(200).json({ success: true, products: [] });
+        }
+
+        // Fetch stock information for all filtered products
+        const productIds = filteredProducts.map(product => product._id);
+        let storeStocks = await Store.find({ productId: { $in: productIds } });
+
+        // If filtering by store
+        if (req.query.store) {
+            storeStocks = storeStocks.filter(stock => stock.storeName === req.query.store);
+        }
+
+        // Group store stocks by productId
+        const stockByProduct = storeStocks.reduce((acc, stock) => {
+            const productId = stock.productId.toString();
+            if (!acc[productId]) {
+                acc[productId] = [];
+            }
+            acc[productId].push(stock);
+            return acc;
+        }, {});
+
+        // Add stock information to the products
+        const productsWithStock = filteredProducts.map(product => {
+            const stores = stockByProduct[product._id.toString()] || [];
+            const totalStock = stores.reduce((total, stock) => total + stock.stock, 0);
+            const outOfStock = totalStock <= 0;
+            return {
+                ...product.toObject(),
+                stores: stores.map(store => ({
+                    storeName: store.storeName,
+                    stock: store.stock
+                })),
+                
+            };
+        });
+        console.log(productsWithStock)
 
         res.status(200).json({
             success: true,
-            count: filteredProducts.length,
-            data: filteredProducts
+            count: productsWithStock.length,
+            data: productsWithStock
         });
     } catch (error) {
         console.error(error);
@@ -258,10 +332,15 @@ exports.filterAll = catchAsyncErrors(async (req, res, next) => {
     }
 });
 
+
+
 exports.fetchByBrand = catchAsyncErrors(async (req, res, next) => {
     try {
         const { brandName } = req.params;
-        console.log(brandName);
+
+        if (!brandName) {
+            return res.status(400).json({ success: false, error: "Brand name parameter is required." });
+        }
 
         // Use a case-insensitive regex for brand name search
         const products = await Product.find({ brand: { $regex: new RegExp(brandName, "i") } });
@@ -271,11 +350,47 @@ exports.fetchByBrand = catchAsyncErrors(async (req, res, next) => {
             return res.status(200).json({ success: true, products: [] });
         }
 
-        res.status(200).json({ success: true, products });
+        // Fetch stock information for all products from all stores
+        const productIds = products.map(product => product._id);
+        const storeStocks = await Store.find({ productId: { $in: productIds } });
+
+        // Group store stocks by productId
+        const stockByProduct = storeStocks.reduce((acc, stock) => {
+            const productId = stock.productId.toString();
+            if (!acc[productId]) {
+                acc[productId] = [];
+            }
+            acc[productId].push(stock);
+            return acc;
+        }, {});
+
+        // Add stock information to the products
+        const productsWithStock = products.map(product => {
+            const stores = stockByProduct[product._id.toString()] || [];
+            const totalStock = stores.reduce((total, stock) => total + stock.stock, 0);
+            const outOfStock = totalStock <= 0;
+            return {
+                ...product.toObject(),
+                stores: stores.map(store => ({
+                    storeName: store.storeName,
+                    stock: store.stock
+                })),
+                outOfStock,
+                totalStock
+            };
+        });
+
+        res.status(200).json({
+            success: true,
+            count: productsWithStock.length,
+            products: productsWithStock
+        });
     } catch (error) {
         next(error);
     }
 });
+
+
 
 exports.updateProductStock = catchAsyncErrors(async (req, res, next) => {
     try {
