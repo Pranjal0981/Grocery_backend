@@ -25,9 +25,12 @@ require('./models/config');
 
 // CORS configuration
 const corsOptions = {
-    origin: true,
-    credentials: true
+    origin: 'https://rgsgrocery.com',
+    credentials:true
 };
+
+// Enable CORS
+app.use(cors(corsOptions));
 
 exports.instance = new Razorpay({
     key_id: process.env.RAZORPAY_API_KEY,
