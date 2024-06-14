@@ -4,6 +4,7 @@ const express = require('express');
 const cors = require('cors');
 const fileupload = require('express-fileupload');
 const bodyParser = require('body-parser');
+const MongoStore = require('connect-mongo');
 const session = require('express-session');
 const cookieParser = require('cookie-parser');
 const logger = require('morgan');
@@ -42,6 +43,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 app.use(session({
+    store: MongoStore.create({ mongoUrl: process.env.MONGO_URI }),
     resave: true,
     saveUninitialized: false,
     secret: process.env.EXPRESS_SECRET,
@@ -123,3 +125,5 @@ app.all("*", (req, res, next) => {
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
 });
+
+module.exports = app;
