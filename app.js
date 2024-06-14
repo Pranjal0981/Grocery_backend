@@ -5,6 +5,7 @@ const cors = require('cors');
 const fileupload = require('express-fileupload');
 const bodyParser = require('body-parser');
 const session = require('express-session');
+const MongoStore = require('connect-mongo');
 const cookieParser = require('cookie-parser');
 const logger = require('morgan');
 const { v4: uuidv4 } = require('uuid');
@@ -18,6 +19,8 @@ const productRouter = require('./routes/productRouter');
 const superAdminRouter = require('./routes/superAdminRouter');
 const storeManager = require('./routes/storeRouter');
 const paymentRoute = require('./routes/paymentRouter');
+const mongoose = require('mongoose');
+
 const PORT = process.env.PORT || 3000;
 const app = express();
 require('./models/config');
@@ -30,7 +33,7 @@ const corsOptions = {
 
 exports.instance = new Razorpay({
     key_id: process.env.RAZORPAY_API_KEY,
-    key_secret: process.env.RAZORPAY_APT_SECRET,
+    key_secret: process.env.RAZORPAY_API_SECRET,
 });
 
 app.use(cors(corsOptions));
@@ -42,6 +45,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 app.use(session({
+    store: MongoStore.create({ mongoUrl: process.env.MONGO_URI }),
     resave: true,
     saveUninitialized: false,
     secret: process.env.EXPRESS_SECRET,
@@ -119,7 +123,4 @@ app.all("*", (req, res, next) => {
     res.status(404).send('404 - Not Found');
 });
 
-// Server listening
-app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
-});
+module.exports = app;
