@@ -9,7 +9,7 @@ const Cart=require('../models/cart')
 const jwt=require('jsonwebtoken')
 exports.getProducts = catchAsyncErrors(async (req, res, next) => {
     const page = req.query.page || 1; // Default to page 1 if not provided
-    const limit = 1000;
+    const limit = 20;
 
     try {
         let query = {}; // Initialize an empty query object
@@ -28,6 +28,8 @@ exports.getProducts = catchAsyncErrors(async (req, res, next) => {
 
         const totalPages = Math.ceil(totalCount / limit); // Total number of pages
 
+        const skip = (page - 1) * limit; // Calculate the number of documents to skip
+
         const productsWithStores = await Product.aggregate([
             {
                 $match: query // Apply the query condition
@@ -39,6 +41,12 @@ exports.getProducts = catchAsyncErrors(async (req, res, next) => {
                     foreignField: 'productId', // Field from the StoreStock collection
                     as: 'stores' // Output array field
                 }
+            },
+            {
+                $skip: skip // Skip documents
+            },
+            {
+                $limit: limit // Limit the number of documents returned
             }
         ]);
 
@@ -56,6 +64,7 @@ exports.getProducts = catchAsyncErrors(async (req, res, next) => {
         next(error);
     }
 });
+
 
 
 
