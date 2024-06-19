@@ -119,6 +119,7 @@ exports.signUp = catchAsyncErrors(async (req, res, next) => {
     }
 });
 
+
 exports.login = catchAsyncErrors(async (req, res, next) => {
     try {
         console.log(req.body);

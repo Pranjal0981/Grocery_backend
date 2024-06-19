@@ -9,7 +9,7 @@ const Cart=require('../models/cart')
 const jwt=require('jsonwebtoken')
 exports.getProducts = catchAsyncErrors(async (req, res, next) => {
     const page = req.query.page || 1; // Default to page 1 if not provided
-    const limit = 20;
+    const limit = 5000;
 
     try {
         let query = {}; // Initialize an empty query object
@@ -80,7 +80,7 @@ exports.filterCatProduct = catchAsyncErrors(async (req, res, next) => {
         }
 
         const page = parseInt(req.query.page) || 1;
-        const limit = 12;
+        const limit = 30000;
         const skip = (page - 1) * limit;
 
         // Use a case-insensitive regular expression for the category
