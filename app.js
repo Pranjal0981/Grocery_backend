@@ -25,8 +25,7 @@ require('./models/config');
 
 // CORS configuration
 const corsOptions = {
-    origin: ['https://rgsgrocery.com',
-    'http://localhost:5173',],
+    origin: true,
     credentials:true
 };
 
