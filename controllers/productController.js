@@ -43,6 +43,27 @@ exports.getProducts = catchAsyncErrors(async (req, res, next) => {
                 }
             },
             {
+                $addFields: {
+                    // Create a field for custom sorting based on category
+                    sortOrder: {
+                        $cond: [
+                            { $regexMatch: { input: "$category", regex: /^Atta/ } }, // Match exact "Atta"
+                            1,
+                            {
+                                $cond: [
+                                    { $regexMatch: { input: "$category", regex: /^Oil & Ghee/ } }, // Match exact "Oil"
+                                    2,
+                                    3 // All other categories
+                                ]
+                            }
+                        ]
+                    }
+                }
+            },
+            {
+                $sort: { sortOrder: 1, _id: 1 } // Sort by the custom field and then by _id for consistent ordering
+            },
+            {
                 $skip: skip // Skip documents
             },
             {
@@ -64,7 +85,6 @@ exports.getProducts = catchAsyncErrors(async (req, res, next) => {
         next(error);
     }
 });
-
 
 
 

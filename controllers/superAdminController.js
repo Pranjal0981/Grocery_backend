@@ -10,7 +10,7 @@ const {User} = require('../models/userModel')
 const Order = require('../models/orderModel')
 const Contact=require('../models/contact')
 const crypto = require('crypto');
-
+const jwt=require('jsonwebtoken')
 const ErrorHandler=require("../utils/ErrorHandler")
 exports.registerSuperAdmin = catchAsyncErrors(async (req, res, next) => {
     try {
@@ -70,17 +70,34 @@ exports.loginSuperAdmin = catchAsyncErrors(async (req, res, next) => {
 
 exports.currentSuperAdmin = catchAsyncErrors(async (req, res, next) => {
     try {
-        console.log("======", req.id)
-        const superAdmin = await SuperAdmin.findById(req.id).exec();
-        console.log("=====:", superAdmin)
-        superAdmin.isAuth = true
-        if (!superAdmin) {
-            return res.status(404).json({ success: false, message: "User not found" });
+        // Check if token is available in the Authorization header
+        const authHeader = req.headers.authorization;
+console.log("====",authHeader)
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+            return res.status(401).json({ success: false, message: 'User not authenticated' });
         }
+
+        const token = authHeader.split(' ')[1];
+
+        // Verify the token and extract user ID
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const userId = decoded.id;
+
+        const superAdmin = await SuperAdmin.findById(userId).exec();
+
+        if (!superAdmin) {
+            return res.status(404).json({ success: false, message: 'User not found' });
+        }
+
+        superAdmin.isAuth = true;
+        superAdmin.lastLogin = new Date();
+
+        await superAdmin.save();
+
         res.json({ success: true, superAdmin });
     } catch (error) {
-        console.error("Error fetching current user:", error);
-        res.status(500).json({ success: false, message: "Internal server error" });
+        console.error('Error fetching current admin:', error);
+        res.status(500).json({ success: false, message: 'Internal server error' });
     }
 });
 
