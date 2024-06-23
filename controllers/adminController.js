@@ -425,73 +425,72 @@ exports.fetchAllProducts = catchAsyncErrors(async (req, res, next) => {
 
 exports.fetchOutOfStockProducts = catchAsyncErrors(async (req, res, next) => {
     try {
-        const page = parseInt(req.query.page) || 1;
-        const limit = 1000; // Number of products per page
-        const skip = (page - 1) * limit;
+        // Aggregation for Duplicate Products by productName
+        const duplicateProductsByName = await Product.aggregate([
+            {
+                $group: {
+                    _id: { productName: "$productName" },
+                    count: { $sum: 1 },
+                    products: { $push: "$$ROOT" }
+                }
+            },
+            { $match: { count: { $gt: 1 } } }
+        ]);
 
-        // Aggregation to find out-of-stock products
-        const outOfStockProductsAggregation = await Store.aggregate([
+        // Aggregation for Duplicate Products by productCode
+        const duplicateProductsByCode = await Product.aggregate([
+            {
+                $group: {
+                    _id: { productCode: "$productCode" },
+                    count: { $sum: 1 },
+                    products: { $push: "$$ROOT" }
+                }
+            },
+            { $match: { count: { $gt: 1 } } }
+        ]);
+
+        // Find Products with Invalid Stock or Missing storeName
+        const invalidStockOrMissingStoreNameProducts = await Store.aggregate([
             {
                 $match: {
                     $or: [
                         { stock: 0 },
                         { stock: { $exists: false } },
-                        { stock: null }
+                        { stock: null },
+                        { storeName: { $exists: false } },
+                        { storeName: null }
                     ]
                 }
             },
             {
                 $lookup: {
-                    from: 'products', // Collection name in MongoDB
+                    from: 'products',
                     localField: 'productId',
                     foreignField: '_id',
                     as: 'productDetails'
                 }
             },
             { $unwind: '$productDetails' },
-            { $match: { productDetails: { $ne: null } } }, // Ensure productDetails is not null
-            { $skip: skip },
-            { $limit: limit },
             {
                 $project: {
                     _id: 1,
                     storeName: 1,
                     stock: 1,
-                    productId: '$productId', // Include productId in the result
-                    productDetails: {
-                        productName: 1,
-                        description: 1,
-                        sellingPrice: 1,
-                        category: 1,
-                        brand: 1,
-                        purchasePrice: 1,
-                        MRP: 1,
-                        size: 1,
-                        gst: 1,
-                        cgst: 1,
-                        image: 1,
-                        productCode: 1,
-                        createdAt: 1
-                    }
+                    productId: 1,
+                    productDetails: 1
                 }
             }
         ]);
 
-        // Get the total count of out-of-stock products including null stock values
-        const totalCount = await Store.countDocuments({
-            $or: [
-                { stock: 0 },
-                { stock: { $exists: false } },
-                { stock: null }
-            ]
-        });
-        const totalPages = Math.ceil(totalCount / limit);
+        const invalidAndDuplicateProducts = {
+            duplicateProductsByName,
+            duplicateProductsByCode,
+            invalidStockOrMissingStoreNameProducts
+        };
 
         res.status(200).json({
             success: true,
-            outOfStockProducts: outOfStockProductsAggregation,
-            totalCount,
-            totalPages,
+            outOfStock: invalidAndDuplicateProducts
         });
     } catch (error) {
         console.error(error);
