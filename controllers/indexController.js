@@ -1,5 +1,6 @@
 const { catchAsyncErrors } = require('../middlewares/catchAsyncError')
 const { User, Address } = require('../models/userModel');
+const crypto=require('crypto')
 const nodemailer=require('nodemailer')
 const Admin = require('../models/adminModel')
 const { sendToken } = require('../utils/sendToken');
@@ -18,6 +19,8 @@ const {v4: uuidv4 } = require('uuid');
 const Store=require('../models/StoreStock')
 const axios=require('axios')
 const jwt=require('jsonwebtoken')
+const shortid=require('shortid')
+const Referral=require('../models/referal')
 exports.currentUser = catchAsyncErrors(async (req, res, next) => {
     try {
         // Check if token is available in the Authorization header
@@ -90,35 +93,44 @@ exports.currentUser = catchAsyncErrors(async (req, res, next) => {
 //         res.status(500).json({ success: false, message: 'Error copying product stocks.' });
 //     }
 // });
-
 exports.signUp = catchAsyncErrors(async (req, res, next) => {
     try {
-        // console.log(req.body)
-        // const authorizedSources = process.env.AUTHORIZED_EMAIL.split(',');
-        const { email } = req.body.formData;
-        // if (!authorizedSources.includes(email)) {
-        //     return res.status(403).json({ success: false, message: 'Unauthorized registration' });
-        // }
-        console.log(req.body)
-        const { password } = req.body.formData;
+        const { email, password, referralCode } = req.body.formData;
+
+        // Check if the user already exists
         const existingUser = await User.findOne({ email });
         if (existingUser) {
-            return res.status(400).json({ success: false, message: 'Admin with this email already exists' });
+            return res.status(400).json({ success: false, message: 'User with this email already exists' });
         }
+
+        // Create a new user
         const newUser = new User({
             email,
             password,
-            
         });
 
+        // Save the new user
         await newUser.save();
+
+        // If a referral code is provided, validate and use it
+        if (referralCode) {
+            const referral = await Referral.findOne({ code: referralCode });
+            if (referral) {
+                // Add the new user to the referredUsers array
+                referral.referredUsers.push(newUser._id);
+                await referral.save();
+            } else {
+                return res.status(400).json({ success: false, message: 'Invalid referral code' });
+            }
+        }
+
+        // Send token to the user
         sendToken(newUser, 201, res);
     } catch (error) {
         console.error('Error registering newUser:', error);
         res.status(500).json({ success: false, message: 'Internal server error' });
     }
 });
-
 
 exports.login = catchAsyncErrors(async (req, res, next) => {
     try {
@@ -1001,3 +1013,48 @@ exports.clearCart = catchAsyncErrors(async (req, res, next) => {
 //         return res.status(500).json({ error: 'An unexpected error occurred' });
 //     }
 // });
+
+exports.generateReferralCode = async (req, res, next) => {
+    try {
+        const user = await User.findById(req.body.userId);
+
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        // Check if the user already has a referral code
+        if (user.referralCode) {
+            return res.status(200).json({ referralCode: user.referralCode });
+        }
+
+        let referralCode;
+        let isUnique = false;
+
+        // Loop until a unique referral code is generated
+        while (!isUnique) {
+            referralCode = shortid.generate(); // Generate a short, unique ID
+
+            // Check if the generated referral code is already in use
+            const existingReferral = await Referral.findOne({ code: referralCode });
+
+            if (!existingReferral) {
+                isUnique = true;
+            }
+        }
+
+        // Save the referral code to the user document
+        user.referralCode = referralCode;
+        await user.save();
+
+        // Create a new Referral document to track the referral code usage
+        const newReferral = new Referral({
+            code: referralCode,
+            owner:req.body.userId
+        });
+        await newReferral.save();
+
+        res.status(200).json({ referralCode });
+    } catch (error) {
+        next(error); // Pass any errors to the error handling middleware
+    }
+};

@@ -45,6 +45,11 @@ const userSchema = new mongoose.Schema({
         type: String,
         minlength: [4, "Firstname should be at least 4 characters long"]
     },
+    referralCode:{
+        type:String,
+        // required:true,
+        unique:true,
+    },
     phone: {
         type: String,
     },
