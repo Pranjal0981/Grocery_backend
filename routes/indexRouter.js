@@ -1,5 +1,5 @@
 const express = require('express')
-const { currentUser, signUp, login, copyStore, logout, updateUser, generateReferralCode, updateCart, deleteUser, doPayment, updateProductQuantity,setAddressIndex, returnRequest, deleteAddress, addAddress, addToWishlist, fetchWishlist, deleteFromWishlist, fetchProducts, addToCart, deleteFromCart, fetchCartProducts, userforgetlink, userSendMail, userOrder, fetchUserOrder, contactUs, setPreferredStore, clearCart, selectAddressIndex } = require('../controllers/indexController')
+const { currentUser, signUp, login, copyStore, logout, updateUser, generateReferralCode, updateCart, deleteUser, doPayment, updateProductQuantity,setAddressIndex, returnRequest, deleteAddress, addAddress, addToWishlist, fetchWishlist, deleteFromWishlist, fetchProducts, addToCart, deleteFromCart, fetchCartProducts, userforgetlink, userSendMail, userOrder, fetchUserOrder, contactUs, setPreferredStore, clearCart, selectAddressIndex, addToWallet } = require('../controllers/indexController')
 const { isAuthenticated } = require('../middlewares/auth')
 const { checkout, paymentVerification } = require('../controllers/paymentController')
 const router = express.Router()
@@ -63,5 +63,6 @@ router.post('/updateProductQuantity',isAuthenticated,updateProductQuantity)
 
 router.post('/generateReferralCode',isAuthenticated,generateReferralCode)
 
+router.post('/addToWallet/:userId',isAuthenticated,addToWallet)
 // router.post('/copystore',copyStore)
 module.exports = router

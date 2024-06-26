@@ -103,25 +103,42 @@ exports.signUp = catchAsyncErrors(async (req, res, next) => {
             return res.status(400).json({ success: false, message: 'User with this email already exists' });
         }
 
+        // If a referral code is provided, validate it first
+        if (referralCode) {
+            const referral = await Referral.findOne({ code: referralCode });
+
+            if (!referral) {
+                return res.status(400).json({ success: false, message: 'Invalid referral code' });
+            }
+
+            // Check if the user has already been referred in any document
+            const alreadyReferred = await Referral.findOne({ referredUsers: existingUser?._id });
+            if (alreadyReferred) {
+                return res.status(400).json({ success: false, message: 'User has already used a referral code' });
+            }
+        }
+
         // Create a new user
         const newUser = new User({
             email,
             password,
+            wallet: 0, // Initialize wallet balance
         });
 
         // Save the new user
         await newUser.save();
 
-        // If a referral code is provided, validate and use it
+        // If a referral code is provided, use it
         if (referralCode) {
             const referral = await Referral.findOne({ code: referralCode });
-            if (referral) {
-                // Add the new user to the referredUsers array
-                referral.referredUsers.push(newUser._id);
-                await referral.save();
-            } else {
-                return res.status(400).json({ success: false, message: 'Invalid referral code' });
-            }
+
+            // Add 20 rupees to the user's wallet
+            newUser.wallet += 20;
+            await newUser.save();
+
+            // Add the new user to the referredUsers array
+            referral.referredUsers.push(newUser._id);
+            await referral.save();
         }
 
         // Send token to the user
@@ -131,6 +148,8 @@ exports.signUp = catchAsyncErrors(async (req, res, next) => {
         res.status(500).json({ success: false, message: 'Internal server error' });
     }
 });
+
+
 
 exports.login = catchAsyncErrors(async (req, res, next) => {
     try {
@@ -165,8 +184,6 @@ exports.login = catchAsyncErrors(async (req, res, next) => {
         res.status(500).json({ message: 'Internal server error' });
     }
 });
-
-
 
 exports.logout = catchAsyncErrors(async (req, res, next) => {
     res.clearCookie("token")
@@ -750,6 +767,24 @@ exports.userOrder = catchAsyncErrors(async (req, res) => {
         // Save the order document
         await order.save();
 
+        // Deduct from user's wallet if paymentType is 'wallet'
+        if (paymentType === 'Wallet Payment') {
+            const user = await User.findById(userId);
+
+            if (!user) {
+                return res.status(404).json({ success: false, message: 'User not found' });
+            }
+
+            // Check if user has sufficient balance
+            if (user.wallet < totalGrandPrice) {
+                return res.status(400).json({ success: false, message: 'Insufficient wallet balance' });
+            }
+
+            // Deduct from wallet
+            user.wallet -= totalGrandPrice;
+            await user.save();
+        }
+
         const emailSent = await sendMailHandler(email, pdfUrl); // Send the email with the PDF attachment
 
         if (!emailSent) {
@@ -813,7 +848,29 @@ exports.updateProductQuantity = catchAsyncErrors(async (req, res, next) => {
     }
 })
     
+exports.addToWallet = catchAsyncErrors(async (req, res, next) => {
+    const {  amount } = req.body;
+const {userId}=req.params
+    if (!amount || amount <= 0) {
+        return res.status(400).json({ success: false, message: 'Invalid amount' });
+    }
 
+    try {
+        const user = await User.findById(userId);
+
+        if (!user) {
+            return res.status(404).json({ success: false, message: 'User not found' });
+        }
+
+        user.wallet += amount;
+        await user.save();
+
+        res.status(200).json({ success: true, message: 'Wallet updated successfully', wallet: user.wallet });
+    } catch (error) {
+        console.error('Error updating wallet:', error);
+        res.status(500).json({ success: false, message: 'Internal server error' });
+    }
+});
 
 exports.fetchUserOrder = catchAsyncErrors(async (req, res, next) => {
     try {
@@ -1014,7 +1071,7 @@ exports.clearCart = catchAsyncErrors(async (req, res, next) => {
 //     }
 // });
 
-exports.generateReferralCode = async (req, res, next) => {
+exports.generateReferralCode =catchAsyncErrors( async (req, res, next) => {
     try {
         const user = await User.findById(req.body.userId);
 
@@ -1027,12 +1084,14 @@ exports.generateReferralCode = async (req, res, next) => {
             return res.status(200).json({ referralCode: user.referralCode });
         }
 
+        const prefix = "GROCERY";
         let referralCode;
         let isUnique = false;
 
         // Loop until a unique referral code is generated
         while (!isUnique) {
-            referralCode = shortid.generate(); // Generate a short, unique ID
+            const randomNumber = Math.floor(1000 + Math.random() * 9000); // Generate a 4-digit random number
+            referralCode = `${prefix}${randomNumber}`;
 
             // Check if the generated referral code is already in use
             const existingReferral = await Referral.findOne({ code: referralCode });
@@ -1049,7 +1108,7 @@ exports.generateReferralCode = async (req, res, next) => {
         // Create a new Referral document to track the referral code usage
         const newReferral = new Referral({
             code: referralCode,
-            owner:req.body.userId
+            owner: req.body.userId
         });
         await newReferral.save();
 
@@ -1057,4 +1116,4 @@ exports.generateReferralCode = async (req, res, next) => {
     } catch (error) {
         next(error); // Pass any errors to the error handling middleware
     }
-};
+});

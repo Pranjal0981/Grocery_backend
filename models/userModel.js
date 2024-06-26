@@ -61,6 +61,10 @@ const userSchema = new mongoose.Schema({
         type: Number,
         default: -1
     },
+    wallet:{
+        type:Number,
+        default:0
+    },
     isAuth: {
         type: Boolean,
         default: false
