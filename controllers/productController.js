@@ -256,7 +256,7 @@ exports.fetchProductByStore = catchAsyncErrors(async (req, res, next) => {
         // Make the store name case insensitive
         store = new RegExp(store, 'i');
         const page = parseInt(req.query.page) || 1;
-        const limit = 12;
+        const limit = 1000;
         const skip = (page - 1) * limit;
 
         // Find store stocks matching the store name
