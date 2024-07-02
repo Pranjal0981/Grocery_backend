@@ -50,6 +50,11 @@ const userSchema = new mongoose.Schema({
         // required:true,
         unique:true,
     },
+    incentive:{
+        type:Number,
+        
+    },
+    
     phone: {
         type: String,
     },

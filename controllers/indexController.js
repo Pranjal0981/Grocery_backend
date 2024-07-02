@@ -21,6 +21,30 @@ const axios=require('axios')
 const jwt=require('jsonwebtoken')
 const shortid=require('shortid')
 const Referral=require('../models/referal')
+
+const checkReferral = async (userId) => {
+    try {
+        // Query to find if the user is referred
+        const referral = await Referral.findOne({ referredUsers: userId }).populate({
+            path: 'owner',
+            select: 'referralCode' // Only select the referralCode from the owner
+        });
+
+        if (!referral) {
+            return null; // User is not referred
+        }
+
+        // User is referred, return the owner's referral code
+        return {
+            referralCode: referral.owner.referralCode,
+            referredBy: referral.owner // Optionally, you can return the entire owner object if needed
+        };
+    } catch (error) {
+        console.error('Error checking referral:', error);
+        throw new Error('Error checking referral');
+    }
+};
+
 exports.currentUser = catchAsyncErrors(async (req, res, next) => {
     try {
         // Check if token is available in the Authorization header
@@ -42,13 +66,24 @@ exports.currentUser = catchAsyncErrors(async (req, res, next) => {
             return res.status(404).json({ success: false, message: 'User not found' });
         }
 
+        // Update user's authentication status and last login time
         user.isAuth = true;
-
         user.lastLogin = new Date();
-
         await user.save();
 
-        res.json({ success: true, user });
+        // Check if the user is referred by any other user
+        const referralData = await checkReferral(userId);
+
+        // Prepare the response object
+        const userData = {
+            ...user.toObject(), // Convert user Mongoose document to plain JavaScript object
+            referralCode: user.referralCode, // Include user's referral code if it exists
+            referredByReferralCode: referralData ? referralData.referralCode : null, // Referral code of referring user
+            referredBy: referralData && referralData.referredBy ? referralData.referredBy.toObject() : null // Details of referring user
+            // Add more fields as needed
+        };
+
+        res.json({ success: true, user: userData });
     } catch (error) {
         console.error('Error fetching current user:', error);
         res.status(500).json({ success: false, message: 'Internal server error' });
@@ -95,6 +130,7 @@ exports.currentUser = catchAsyncErrors(async (req, res, next) => {
 // });
 exports.signUp = catchAsyncErrors(async (req, res, next) => {
     try {
+        console.log(req.body)
         const { email, password, referralCode } = req.body.formData;
 
         // Check if the user already exists
@@ -289,7 +325,7 @@ exports.fetchWishlist = catchAsyncErrors(async (req, res, next) => {
         if (!wishlist) {
             return res.status(404).json({ success: false, message: 'Wishlist not found for this user' });
         }
-
+console.log(wishlist)
         res.status(200).json({ success: true, data: wishlist });
     } catch (error) {
         next(error);
@@ -433,7 +469,6 @@ exports.updateCart = catchAsyncErrors(async (req, res, next) => {
         res.status(500).json({ success: false, message: 'Internal Server Error' });
     }
 });
-
 
 
 exports.deleteFromCart = catchAsyncErrors(async (req, res, next) => {
@@ -741,12 +776,12 @@ exports.userOrder = catchAsyncErrors(async (req, res) => {
             return { productId, quantity, totalPrice, store };
         });
 
-        // Handle the PDF file upload to ImageKit
+        // Handle the PDF file upload to ImageKit (assuming imagekitClient is correctly configured)
         let pdfUrl = '';
         if (req.files && req.files.pdfFile) {
             const pdfFile = req.files.pdfFile;
             const result = await imagekitClient.upload({
-                file: pdfFile.data, // Buffer or base64
+                file: pdfFile.data,
                 fileName: pdfFile.name,
                 folder: "/orders"
             });
@@ -755,11 +790,11 @@ exports.userOrder = catchAsyncErrors(async (req, res) => {
 
         // Create a new order document
         const order = new Order({
-            products: productArr, // Set the products array
-            userId: userId, // Set the user reference directly from req.params
-            totalGrandPrice, // Set the totalGrandPrice
-            PaymentType: paymentType, // Set the payment type
-            pdfUrl,// Set the PDF URL
+            products: productArr,
+            userId: userId,
+            totalGrandPrice,
+            PaymentType: paymentType,
+            pdfUrl,
             OrderId: orderId,
             InvoiceNumber: invoiceNumber
         });
@@ -785,7 +820,23 @@ exports.userOrder = catchAsyncErrors(async (req, res) => {
             await user.save();
         }
 
-        const emailSent = await sendMailHandler(email, pdfUrl); // Send the email with the PDF attachment
+        // Check if the user is referred by any other user
+        const referral = await Referral.findOne({ referredUsers: userId });
+
+        if (referral) {
+            // Retrieve the owner of the referral code
+            const owner = await User.findById(referral.owner);
+
+            if (owner) {
+                // Calculate incentive (1% of totalGrandPrice)
+                const incentiveAmount = totalGrandPrice * 0.01;
+                owner.wallet += incentiveAmount;
+                await owner.save();
+            }
+        }
+
+        // Send email with the PDF attachment
+        const emailSent = await sendMailHandler(email, pdfUrl);
 
         if (!emailSent) {
             return res.status(500).json({ success: false, message: 'Failed to send email' });
@@ -794,7 +845,6 @@ exports.userOrder = catchAsyncErrors(async (req, res) => {
         // Send success response
         res.status(200).json({ success: true, message: 'Order placed successfully', order });
     } catch (error) {
-        // Handle errors
         console.error('Error in userOrder controller:', error);
         res.status(500).json({ success: false, message: 'Internal server error' });
     }
