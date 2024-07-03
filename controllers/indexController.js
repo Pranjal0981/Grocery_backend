@@ -130,8 +130,8 @@ exports.currentUser = catchAsyncErrors(async (req, res, next) => {
 // });
 exports.signUp = catchAsyncErrors(async (req, res, next) => {
     try {
-        console.log(req.body)
         const { email, password, referralCode } = req.body.formData;
+        console.log('Request body:', req.body);
 
         // Check if the user already exists
         const existingUser = await User.findOne({ email });
@@ -139,18 +139,21 @@ exports.signUp = catchAsyncErrors(async (req, res, next) => {
             return res.status(400).json({ success: false, message: 'User with this email already exists' });
         }
 
-        // If a referral code is provided, validate it first
-        if (referralCode) {
-            const referral = await Referral.findOne({ code: referralCode });
+        let referringUser = null;
+        let referral = null;
 
+        // If a referral code is provided, validate it and get the referral document
+        if (referralCode) {
+            referral = await Referral.findOne({ code: referralCode });
+            console.log('Referral found:', referral);
             if (!referral) {
                 return res.status(400).json({ success: false, message: 'Invalid referral code' });
             }
 
-            // Check if the user has already been referred in any document
-            const alreadyReferred = await Referral.findOne({ referredUsers: existingUser?._id });
-            if (alreadyReferred) {
-                return res.status(400).json({ success: false, message: 'User has already used a referral code' });
+            referringUser = await User.findById(referral.owner);
+            console.log('Referring user:', referringUser);
+            if (!referringUser) {
+                return res.status(400).json({ success: false, message: 'Referring user not found' });
             }
         }
 
@@ -164,15 +167,10 @@ exports.signUp = catchAsyncErrors(async (req, res, next) => {
         // Save the new user
         await newUser.save();
 
-        // If a referral code is provided, use it
-        if (referralCode) {
-            const referral = await Referral.findOne({ code: referralCode });
-
-            // Add 20 rupees to the user's wallet
-            newUser.wallet += 20;
-            await newUser.save();
-
-            // Add the new user to the referredUsers array
+        // If a referral code is provided, update wallets and referral
+        if (referralCode && referringUser) {
+            // Credit wallets and save referral data
+            await referral.creditWallets(newUser);
             referral.referredUsers.push(newUser._id);
             await referral.save();
         }
@@ -184,6 +182,7 @@ exports.signUp = catchAsyncErrors(async (req, res, next) => {
         res.status(500).json({ success: false, message: 'Internal server error' });
     }
 });
+
 
 
 
@@ -474,7 +473,7 @@ exports.updateCart = catchAsyncErrors(async (req, res, next) => {
 exports.deleteFromCart = catchAsyncErrors(async (req, res, next) => {
     try {
         const { userId, productId } = req.params;
-
+console.log(req.params)
         if (!mongoose.Types.ObjectId.isValid(userId) || !mongoose.Types.ObjectId.isValid(productId)) {
             return res.status(400).json({ success: false, message: 'Invalid user ID or product ID' });
         }
@@ -853,7 +852,7 @@ exports.userOrder = catchAsyncErrors(async (req, res) => {
 exports.updateProductQuantity = catchAsyncErrors(async (req, res, next) => {
     try {
         const { productId, quantity,userId} = req.body;
-
+console.log(req.body)
         const user = await User.findById(userId);
         if (!user || user.userType !== 'customer') {
             return res.status(403).json({ success: false, message: 'Only customers can update products in the cart' });
