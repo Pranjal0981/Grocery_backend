@@ -25,10 +25,9 @@ require('./models/config');
 
 // CORS configuration
 const corsOptions = {
-    origin: ['https://rgsgrocery.com/'] ,
-    credentials:true
+    origin: 'https://rgsgrocery.com',
+    credentials: true
 };
-
 // Enable CORS
 app.use(cors(corsOptions));
 
