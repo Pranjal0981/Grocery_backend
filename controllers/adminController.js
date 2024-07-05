@@ -21,7 +21,7 @@ exports.registerAdmin = catchAsyncErrors(async (req, res, next) => {
         //     return res.status(403).json({ success: false, message: 'Unauthorized registration' });
         // }
         console.log(req.body)
-        const { password, store } = req.body;
+        const { password } = req.body;
         const existingAdmin = await Admin.findOne({ email });
         if (existingAdmin) {
             return res.status(400).json({ success: false, message: 'Admin with this email already exists' });
@@ -29,7 +29,6 @@ exports.registerAdmin = catchAsyncErrors(async (req, res, next) => {
         const newAdmin = new Admin({
             email,
             password,
-            store:store
         });
 
         await newAdmin.save();  
@@ -268,11 +267,10 @@ exports.deleteProduct = catchAsyncErrors(async (req, res, next) => {
 //         res.status(500).json({ success: false, message: 'Error copying product stocks.' });
 //     }
 // });
-
 exports.fetchOrders = catchAsyncErrors(async (req, res, next) => {
     try {
         const { store } = req.params;
-        console.log(store)
+        console.log(`Store: ${store}`);
         const page = parseInt(req.query.page) || 1;
         const limit = 10;
         const skip = (page - 1) * limit;
@@ -289,8 +287,8 @@ exports.fetchOrders = catchAsyncErrors(async (req, res, next) => {
                 })
                 .populate('userId')
                 .sort({ createdAt: -1 }) // Sort orders by createdAt field in descending order
-                .skip(skip)
-                .limit(limit);
+             
+            console.log(`Orders: ${orders.length}`);
 
             // Count total number of orders for pagination
             totalCount = await Order.countDocuments({ 'products.store': store });
@@ -312,14 +310,13 @@ exports.fetchOrders = catchAsyncErrors(async (req, res, next) => {
 
         // Calculate total number of pages
         const totalPages = Math.ceil(totalCount / limit);
-
+        console.log(totalPages)
         res.status(200).json({ success: true, data: orders, totalPages });
     } catch (error) {
         console.error(error);
         res.status(500).json({ success: false, error: 'Internal Server Error' });
     }
 });
-
 
 
 
