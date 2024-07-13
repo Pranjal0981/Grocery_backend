@@ -142,14 +142,12 @@ exports.signUp = catchAsyncErrors(async (req, res, next) => {
         let referringUser = null;
         let referral = null;
 
-        // If a referral code is provided, validate it and get the referral document
         if (referralCode) {
             referral = await Referral.findOne({ code: referralCode });
             console.log('Referral found:', referral);
             if (!referral) {
                 return res.status(400).json({ success: false, message: 'Invalid referral code' });
             }
-
             referringUser = await User.findById(referral.owner);
             console.log('Referring user:', referringUser);
             if (!referringUser) {
@@ -157,7 +155,6 @@ exports.signUp = catchAsyncErrors(async (req, res, next) => {
             }
         }
 
-        // Create a new user
         const newUser = new User({
             email,
             password,
@@ -167,15 +164,12 @@ exports.signUp = catchAsyncErrors(async (req, res, next) => {
         // Save the new user
         await newUser.save();
 
-        // If a referral code is provided, update wallets and referral
         if (referralCode && referringUser) {
-            // Credit wallets and save referral data
             await referral.creditWallets(newUser);
             referral.referredUsers.push(newUser._id);
             await referral.save();
         }
 
-        // Send token to the user
         sendToken(newUser, 201, res);
     } catch (error) {
         console.error('Error registering newUser:', error);
@@ -683,7 +677,7 @@ exports.deleteAddress = catchAsyncErrors(async (req, res) => {
 });
 
 
-async function sendMailHandler(email, pdfUrl) {
+async function sendMailHandler(email, pdfUrl, paymentType, orderId, invoiceNumber) {
     console.log(pdfUrl);
     try {
         // Fetch the PDF as a buffer
@@ -835,7 +829,7 @@ exports.userOrder = catchAsyncErrors(async (req, res) => {
         }
 
         // Send email with the PDF attachment
-        const emailSent = await sendMailHandler(email, pdfUrl);
+        const emailSent = await sendMailHandler(email, pdfUrl,paymentType,orderId,invoiceNumber);
 
         if (!emailSent) {
             return res.status(500).json({ success: false, message: 'Failed to send email' });
@@ -1119,6 +1113,7 @@ exports.clearCart = catchAsyncErrors(async (req, res, next) => {
 //         return res.status(500).json({ error: 'An unexpected error occurred' });
 //     }
 // });
+
 
 exports.generateReferralCode =catchAsyncErrors( async (req, res, next) => {
     try {

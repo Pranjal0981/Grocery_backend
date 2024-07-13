@@ -12,6 +12,7 @@ const Contact=require('../models/contact')
 const crypto = require('crypto');
 const jwt=require('jsonwebtoken')
 const ErrorHandler=require("../utils/ErrorHandler")
+const Admin=require('../models/adminModel')
 exports.registerSuperAdmin = catchAsyncErrors(async (req, res, next) => {
     try {
         // console.log(req.body)
@@ -428,4 +429,65 @@ exports.getUserQuery = catchAsyncErrors(async (req, res, next) => {
             error: error.message
         });
     }
+});
+
+exports.getAllAdmin = catchAsyncErrors(async (req, res, next) => {
+    try {
+        const admins = await Admin.find().select('-password'); // Exclude password from the response
+        res.status(200).json({
+            success: true,
+            count: admins.length,
+            data: admins,
+        });
+    } catch (error) {
+        return next(new Error('Failed to fetch admin data'));
+    }
+});
+
+exports.createAdmin = catchAsyncErrors(async (req, res, next) => {
+    const { email, password } = req.body;
+
+    // Hash the password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    const newAdmin = await Admin.create({
+        email,
+        password: hashedPassword,
+    });
+
+    res.status(201).json({
+        success: true,
+        data: newAdmin,
+    });
+});
+
+exports.updatePermission = catchAsyncErrors(async (req, res, next) => {
+    const { adminId, permissions } = req.body;
+
+    if (!adminId || !permissions) {
+        return res.status(400).json({
+            success: false,
+            message: 'Admin ID and permissions are required.'
+        });
+    }
+
+    const updatedAdmin = await Admin.findByIdAndUpdate(
+        adminId,
+        { permissions },
+        { new: true, runValidators: true }
+    );
+
+    if (!updatedAdmin) {
+        return res.status(404).json({
+            success: false,
+            message: 'Admin not found.'
+        });
+    }
+
+    res.status(200).json({
+        success: true,
+        message: 'Permissions updated successfully.',
+        data: updatedAdmin
+    });
 });

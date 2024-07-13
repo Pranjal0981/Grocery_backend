@@ -1,5 +1,5 @@
 const express = require('express')
-const { registerSuperAdmin, loginSuperAdmin, currentSuperAdmin, getUserQuery, fetchAllUsers, unblockMembers, blockMembers, deleteUserBySuperAdmin, fetchLastDayActiveUsers,fetchInactiveUser, logoutSuperAdmin, fetchInfoForDashboard, superAdminSendMail, superAdminForgetLink, searchUser } = require('../controllers/superAdminController')
+const { registerSuperAdmin, loginSuperAdmin, currentSuperAdmin, getUserQuery, fetchAllUsers, unblockMembers, blockMembers, deleteUserBySuperAdmin, fetchLastDayActiveUsers,fetchInactiveUser, logoutSuperAdmin, fetchInfoForDashboard, superAdminSendMail, superAdminForgetLink, searchUser, getAllAdmin, createAdmin, updatePermission } = require('../controllers/superAdminController')
 const { isAuthenticated } = require('../middlewares/auth')
 const router = express.Router()
 
@@ -33,4 +33,10 @@ router.post('/forget-link/:token', superAdminForgetLink)
 router.get('/searchUser',isAuthenticated,searchUser)
 
 router.get('/getUserQuery', isAuthenticated, getUserQuery)
+
+router.get('/getAlladmins',isAuthenticated,getAllAdmin)
+
+router.post('/createAdmin',isAuthenticated, createAdmin);
+
+router.post('/updatePermissions',updatePermission)
 module.exports=router

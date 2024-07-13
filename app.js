@@ -102,6 +102,13 @@ app.use(passport.session());
 app.get('/', (req, res) => {
     res.send('Hello');
 });
+app.use((req, res, next) => {
+    const ipAddress = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+    console.log('Visitor IP Address:', ipAddress);
+
+    next();
+});
+
 
 app.use('/user', indexRouter);
 app.use('/admin', adminRouter);

@@ -111,7 +111,17 @@ exports.logoutAdmin = catchAsyncErrors(async (req, res, next) => {
 
 exports.uploadProducts = catchAsyncErrors(async (req, res, next) => {
     try {
-        console.log(req.body);
+        const adminId = req.id; // Assuming the admin ID is in req.user
+
+        const admin = await Admin.findById(adminId);
+        if (!admin) {
+            return res.status(404).json({ success: false, message: 'Admin not found' });
+        }
+
+        // Check if the admin has the required permissions
+        if (!admin.permissions.canUpdateProducts || !admin.permissions.canManageStores ||!admin.permissions.canAddProducts) {
+            return res.status(403).json({ success: false, message: 'Unauthorized' });
+        }
 
         const {
             productName,
@@ -125,7 +135,7 @@ exports.uploadProducts = catchAsyncErrors(async (req, res, next) => {
             productCode,
             MRP,
             size,
-            ...stores 
+            ...stores
         } = req.body;
 
         const imageFiles = req.files;
@@ -160,14 +170,13 @@ exports.uploadProducts = catchAsyncErrors(async (req, res, next) => {
         });
 
         await product.save();
-        const processedStores = new Set(); 
+        const processedStores = new Set();
         const storeEntries = Object.entries(stores);
         if (storeEntries.length > 0) {
             for (const [key, value] of storeEntries) {
                 const match = key.match(/^stores\[(\d+)\]\[(store|stock)\]$/);
                 if (match) {
                     const index = match[1];
-                    const property = match[2];
                     const storeName = stores[`stores[${index}][store]`];
                     const stock = stores[`stores[${index}][stock]`];
 
@@ -181,7 +190,7 @@ exports.uploadProducts = catchAsyncErrors(async (req, res, next) => {
                             });
                             await newStore.save();
                         }
-                        processedStores.add(storeName); 
+                        processedStores.add(storeName);
                     }
                 }
             }
